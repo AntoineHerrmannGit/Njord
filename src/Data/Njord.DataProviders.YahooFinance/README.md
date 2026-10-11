@@ -2,7 +2,7 @@
 
 `YahooFinanceMarketDataProvider` implements `IMarketDataProvider` using Yahoo Finance's chart and options endpoints. It returns the provider-neutral models from `Njord.MarketData`.
 The public surface is limited to this provider and the market-data business contracts/models in `Njord.MarketData`; Yahoo response envelopes and JSON readers are internal implementation details.
-It uses `IJsonSerializer` from `Njord.Core.Serialization`; applications can pass their shared serializer through the provider's two-argument constructor.
+It uses `IJsonSerializer` from `Njord.Core.Serialization`; the DI registration uses an application-provided serializer when registered, or the shared System.Text.Json implementation otherwise.
 
 ## Code organization
 
@@ -10,13 +10,22 @@ It uses `IJsonSerializer` from `Njord.Core.Serialization`; applications can pass
 - `Serialization/` contains internal Yahoo response envelopes and JSON validation helpers.
 - `Chart/` maps chart responses to common OHLCV bars and quotes.
 - `Options/` maps option-chain responses to common option-chain business models.
+- `Configuration/` contains strongly typed Yahoo endpoint settings and their DI registration.
 
 ```csharp
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Njord.DataProviders.YahooFinance;
+using Njord.DataProviders.YahooFinance.Configuration;
 using Njord.MarketData;
 
-using var httpClient = new HttpClient();
-var provider = new YahooFinanceMarketDataProvider(httpClient);
+var configuration = new ConfigurationBuilder()
+    .AddJsonFile("yahoo-finance.settings.json", optional: false, reloadOnChange: false)
+    .Build();
+var services = new ServiceCollection();
+services.AddYahooFinanceMarketDataProvider(configuration);
+await using var serviceProvider = services.BuildServiceProvider();
+var provider = serviceProvider.GetRequiredService<IMarketDataProvider>();
 
 var request = new HistoricalMarketDataRequest(
     new MarketInstrument("^GSPC", MarketAssetClass.Index),
@@ -33,6 +42,12 @@ var optionChain = await provider.GetOptionChainAsync(
         new DateOnly(2025, 1, 17)),
     cancellationToken);
 ```
+
+## Local configuration
+
+`yahoo-finance.settings.json` is the provider-owned, non-secret configuration example. Place it in the application directory and load it into `IConfiguration` before calling `AddYahooFinanceMarketDataProvider`. The registration binds the `YahooFinance` section, validates that all four endpoints are absolute HTTPS URIs at startup, and registers the provider with `IHttpClientFactory`. Endpoint values are read once when the application starts; hot reload is not enabled.
+
+The application may register its shared `IJsonSerializer` before adding the provider. If it does not, the provider registration supplies `SystemTextJsonSerializer`.
 
 ## Supported instruments and symbols
 
