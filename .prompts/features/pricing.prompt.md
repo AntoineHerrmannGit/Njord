@@ -22,6 +22,7 @@ Fournir des prix et observables reproductibles adaptés aux instruments couverts
 ## Consignes d'implémentation
 
 - Implémente seulement le modèle demandé ; n'annonce pas la prise en charge des autres modèles par anticipation.
+- Pour les modèles et records de données financières, déclare chaque propriété explicitement avec ses accesseurs et privilégie `required init`/`init` et les object initializers. N'utilise pas un constructeur uniquement pour recopier ses paramètres dans des propriétés ; conserve les constructeurs pour un comportement nécessaire qui ne peut pas être exprimé dans les accesseurs.
 - Vérifie que l'instrument et les entrées respectent les hypothèses du modèle. Valide explicitement les domaines numériques et paramètres requis.
 - Sépare les contrats métier des algorithmes et des fournisseurs de courbes/surfaces. Évite que les calculs dépendent directement de l'UI, EF Core ou Redis.
 - Précise l'unité, la devise et la convention de chaque entrée/sortie selon les modèles existants. N'arrondis pas implicitement les résultats.
