@@ -6,7 +6,6 @@ public sealed record Ohlc : MarketDataObservation
     #region OHLC price data
 
     private string _ticker = string.Empty;
-    private string _currency = string.Empty;
     private TimeSpan? _interval;
 
     /// <summary>Gets the ticker identifying the instrument.</summary>
@@ -32,16 +31,8 @@ public sealed record Ohlc : MarketDataObservation
     /// <summary>Gets the closing price.</summary>
     public required decimal Close { get; init; }
 
-    /// <summary>Gets the currency in which the prices are quoted.</summary>
-    public required string Currency
-    {
-        get => _currency;
-        init
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(value);
-            _currency = value;
-        }
-    }
+    /// <summary>Gets the currency in which the prices are quoted, when known.</summary>
+    public string? Currency { get; init; }
 
     /// <summary>Gets the bar interval when supplied by the data source.</summary>
     public TimeSpan? Interval
@@ -61,6 +52,18 @@ public sealed record Ohlc : MarketDataObservation
 
     /// <summary>Gets the indicative end of the bar when supplied by the data source.</summary>
     public DateTimeOffset? PeriodEnd { get; init; }
+
+    /// <summary>Gets the bar volume when supplied by the data source.</summary>
+    public decimal? Volume { get; init; }
+
+    /// <summary>Gets the volume-weighted average price when supplied by the data source.</summary>
+    public decimal? VolumeWeightedAveragePrice { get; init; }
+
+    /// <summary>Gets the transaction count when supplied by the data source.</summary>
+    public long? TransactionCount { get; init; }
+
+    /// <summary>Gets whether the prices are adjusted when the data source provides this information.</summary>
+    public bool? IsAdjusted { get; init; }
 
     #endregion
 }

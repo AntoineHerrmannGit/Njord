@@ -6,7 +6,6 @@ public sealed record Spot : MarketDataObservation
     #region Spot price data
 
     private string _ticker = string.Empty;
-    private string _currency = string.Empty;
 
     /// <summary>Gets the ticker identifying the instrument.</summary>
     public required string Ticker
@@ -22,16 +21,8 @@ public sealed record Spot : MarketDataObservation
     /// <summary>Gets the observed spot price.</summary>
     public required decimal Price { get; init; }
 
-    /// <summary>Gets the currency in which the price is quoted.</summary>
-    public required string Currency
-    {
-        get => _currency;
-        init
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(value);
-            _currency = value;
-        }
-    }
+    /// <summary>Gets the currency in which the price is quoted, when known.</summary>
+    public string? Currency { get; init; }
 
     #endregion
 }

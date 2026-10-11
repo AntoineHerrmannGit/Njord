@@ -25,7 +25,7 @@ public sealed class SpotAndOhlcTests
     }
 
     [Fact]
-    public void Spot_RejectsBlankTickerAndCurrency()
+    public void Spot_RejectsBlankTickerAndAllowsUnknownCurrency()
     {
         Assert.Throws<ArgumentException>(() => new Spot
         {
@@ -34,13 +34,14 @@ public sealed class SpotAndOhlcTests
             Currency = "USD",
             Timestamp = DateTimeOffset.UnixEpoch
         });
-        Assert.Throws<ArgumentException>(() => new Spot
+        var spotWithoutCurrency = new Spot
         {
             Ticker = "EURUSD",
             Price = 1m,
-            Currency = " ",
             Timestamp = DateTimeOffset.UnixEpoch
-        });
+        };
+
+        Assert.Null(spotWithoutCurrency.Currency);
     }
 
     #endregion
@@ -95,6 +96,30 @@ public sealed class SpotAndOhlcTests
         Assert.Null(ohlc.Interval);
         Assert.Null(ohlc.PeriodStart);
         Assert.Null(ohlc.PeriodEnd);
+    }
+
+    [Fact]
+    public void Ohlc_PreservesOptionalMarketDataAttributes()
+    {
+        var ohlc = new Ohlc
+        {
+            Ticker = "AAPL",
+            Open = 10m,
+            High = 12m,
+            Low = 9m,
+            Close = 11m,
+            Timestamp = DateTimeOffset.UnixEpoch,
+            Volume = 1200m,
+            VolumeWeightedAveragePrice = 10.75m,
+            TransactionCount = 42,
+            IsAdjusted = true
+        };
+
+        Assert.Null(ohlc.Currency);
+        Assert.Equal(1200m, ohlc.Volume);
+        Assert.Equal(10.75m, ohlc.VolumeWeightedAveragePrice);
+        Assert.Equal(42, ohlc.TransactionCount);
+        Assert.True(ohlc.IsAdjusted);
     }
 
     [Theory]
