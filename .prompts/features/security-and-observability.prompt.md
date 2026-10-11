@@ -23,6 +23,7 @@ Fournir authentification locale, chiffrement des secrets et audit trail, avec lo
 
 - Avant de coder, précise quel actif est protégé, contre quel acteur et dans quel flux ; respecte les mécanismes OS/plateforme et packages de confiance déjà présents.
 - N'invente pas de primitives cryptographiques. Utilise les APIs reconnues et le modèle de gestion de clés déjà retenu ; distingue chiffrement, stockage de clés et protection de la configuration.
+- Ne configure pas l'application via des variables d'environnement, y compris pour les secrets. Utilise les fichiers JSON locaux dédiés ; les fichiers contenant des secrets ne doivent pas être suivis par Git, doivent avoir des permissions d'accès limitées et, en CI/CD, doivent être fournis comme fichiers secrets protégés.
 - Ne journalise jamais secrets, tokens, chaînes de connexion complètes ou données sensibles. Masque/minimise les informations sensibles sans dégrader l'audit nécessaire.
 - Définis les événements d'audit avec identité disponible, action, cible, horodatage et résultat appropriés. Évite qu'un échec d'audit soit silencieusement présenté comme une opération sûre lorsque la politique exige un audit complet.
 - Sépare l'audit métier (actions et transitions pertinentes imputables à un acteur/run) des traces techniques (étapes, durées, dépendances et erreurs). La complétude requise pour l'audit obligatoire doit être distincte de la collecte diagnostique facultative.

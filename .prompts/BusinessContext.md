@@ -90,7 +90,9 @@ Les vues de logs et de graphes doivent refléter les données réellement collec
 - Le format privilégié pour les configurations est JSON.
 - La configuration d'une fonctionnalité doit être isolée : sa modification ne doit pas changer implicitement le comportement d'une autre fonctionnalité.
 - Si un paramètre ou un composant est partagé et crée un couplage fonctionnel, ce couplage doit être explicitement documenté dans le code, la documentation et les fichiers de configuration concernés.
-- Les secrets ne doivent pas être stockés en clair dans les fichiers JSON ; utiliser les mécanismes de secrets et de chiffrement prévus par l'application.
+- Ne pas utiliser de variables d'environnement pour la configuration de l'application, y compris les credentials : les placer dans le fichier JSON local spécialisé de leur fonctionnalité.
+- Les fichiers contenant des secrets sont locaux, exclus de Git, accessibles uniquement au compte de l'application et ne doivent jamais être publiés dans le dépôt. En CI/CD, fournir le fichier JSON comme artefact secret protégé et le rendre disponible au runtime sans passer par des variables d'environnement.
+- Les fichiers JSON d'exemple suivis par Git ne contiennent aucun secret ; ils utilisent une valeur vide ou un placeholder non fonctionnel.
 
 ### Opérations transversales
 
