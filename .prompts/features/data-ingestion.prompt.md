@@ -24,6 +24,7 @@ Rendre possible l'acquisition, l'import et la récupération de données de marc
 - Réutilise les modèles de marché, conventions et contrats existants. Si aucun contrat n'existe et que la tâche en nécessite un, définis une frontière de connecteur claire et minimale.
 - Garde le mapping JSON/vendor vers les modèles internes dans l'adaptateur du fournisseur.
 - Réutilise l'unique service partagé de sérialisation/désérialisation et ses options/erreurs génériques lorsqu'il existe. Ne recrée pas ces mécanismes dans un connecteur ; garde les DTO de réponse, l'interprétation du schéma vendor et le mapping métier dans l'adaptateur, sans les exposer hors de celui-ci.
+- Pour les réponses JSON structurées d'un fournisseur, définis des DTO typés internes à son adaptateur, désérialise avec le service partagé, puis valide les champs et mappe les données vers les modèles métier Njord. N'analyse pas la réponse en parcourant directement des `JsonElement` pour contourner les DTO ; réserve les API bas niveau aux usages réellement dynamiques qui ne se prêtent pas à un schéma DTO.
 - Rends configurables les paramètres nécessaires du client HTTP par la configuration existante ; ne place jamais de clé API dans le code ou les logs.
 - Pour les appels distants, gère explicitement timeout, annulation, erreurs HTTP, limites de débit et réponses invalides. Applique retry exponentiel et circuit breaker selon les conventions et packages déjà utilisés.
 - Ne retry pas aveuglément les erreurs permanentes ou les opérations non idempotentes.

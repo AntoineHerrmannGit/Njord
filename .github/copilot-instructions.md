@@ -12,6 +12,7 @@
 
 - Garde les changements ciblés, respecte les responsabilités et dépendances existantes, puis adapte et teste les usages directement affectés.
 - Avant d'ajouter un helper ou un mécanisme réutilisable, recherche son propriétaire dans la solution. Centralise chaque responsabilité transversale dans une implémentation faisant autorité et réutilise-la ; ne duplique pas le comportement dans les fonctionnalités. Garde toutefois le parsing de schéma externe et les règles métier dans leurs adaptateurs propriétaires.
+- Pour les réponses structurées de fournisseurs externes, désérialise via le service partagé vers des DTO typés internes à l'adaptateur, puis valide et mappe explicitement vers les modèles métier. Ne parcours pas directement des `JsonElement` comme substitut à des DTO.
 - Maintiens la cible .NET 10 et privilégie les versions stables compatibles avec les frameworks et dépendances du dépôt.
 - Valide le résultat métier demandé avec les tests pertinents avant de conclure ; indique les commandes exécutées et toute validation impossible.
 - Ne suppose pas de conventions financières, de sécurité ou de comportement non établies par le code ou les spécifications. Demande une clarification lorsqu'un choix manquant affecterait ces résultats ou l'architecture au-delà du périmètre accepté.

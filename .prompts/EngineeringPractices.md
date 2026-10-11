@@ -42,6 +42,7 @@ Respecter l'organisation et l'ordre de développement indicatifs décrits dans [
 ## 4. Architecture et code
 
 - Respecter l'architecture, les noms, le formatage et les helpers existants.
+- Pour les réponses structurées d'un système externe, définir des DTO typés internes à l'adaptateur, les désérialiser via le service partagé, puis valider et mapper explicitement vers les modèles métier. Ne pas exposer les DTO hors de l'adaptateur ni utiliser une lecture directe de `JsonElement` comme substitut à un modèle DTO.
 - Appliquer SOLID et le principe de responsabilité unique sans multiplier les projets, couches ou interfaces inutiles.
 - Chaque projet doit avoir un nom qui révèle une seule responsabilité technique ou métier, clairement délimitée (par exemple persistance SQL, cache Redis, workflow d'ingestion, moteur de pricing, modèle métier, contrat/extension technique, application WPF ou ressources UI). Ne pas réunir par commodité des capacités indépendantes (par exemple persistance et cache, workflow et moteur, logique métier et UI) dans un projet fourre-tout.
 - Regrouper les projets sous des répertoires thématiques tels que `Core`, `Data`, `Pricing`, `Backtesting`, `Scripting`, `Extensions` ou `UI`, en cohérence avec l'organisation existante. Les répertoires thématiques regroupent des projets ; ils ne justifient pas de fusionner leurs responsabilités.
