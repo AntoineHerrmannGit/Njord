@@ -4,9 +4,15 @@
     <Project Path="src/Core/Njord.Core.EnumerableExtensions/Njord.Core.EnumerableExtensions.csproj" />
     <Project Path="src/Core/Njord.Core.Serialization/Njord.Core.Serialization.csproj" />
   </Folder>
+  <Folder Name="/src/Models/">
+    <Project Path="src/Models/Njord.Models/Njord.Models.csproj" />
+  </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Core/">
     <Project Path="tests/Core/Njord.Core.EnumerableExtensions.Tests/Njord.Core.EnumerableExtensions.Tests.csproj" />
     <Project Path="tests/Core/Njord.Core.Serialization.Tests/Njord.Core.Serialization.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Models/">
+    <Project Path="tests/Models/Njord.Models.Tests/Njord.Models.Tests.csproj" />
   </Folder>
 </Solution>
