@@ -11,6 +11,8 @@
 ## Principes de mise en œuvre
 
 - Garde les changements ciblés, respecte les responsabilités et dépendances existantes, puis adapte et teste les usages directement affectés.
+- Dans les structures de contrôle dont le langage autorise un corps sans accolades, omets-les pour une instruction unique et écris condition et instruction sur des lignes séparées. N'écris pas de code compact sur une seule ligne ; conserve les accolades nécessaires à la syntaxe ou au regroupement de plusieurs instructions.
+- En C#, regroupe les membres des classes dans des régions `#region` avec des noms explicites correspondant aux responsabilités ou fonctionnalités, pour rendre méthodes et comportements rapidement repérables. Garde les groupes cohérents et n'utilise pas les régions pour éviter de séparer des responsabilités distinctes en classes.
 - Avant d'ajouter un helper ou un mécanisme réutilisable, recherche son propriétaire dans la solution. Centralise chaque responsabilité transversale dans une implémentation faisant autorité et réutilise-la ; ne duplique pas le comportement dans les fonctionnalités. Garde toutefois le parsing de schéma externe et les règles métier dans leurs adaptateurs propriétaires.
 - Pour les réponses structurées de fournisseurs externes, désérialise via le service partagé vers des DTO typés internes à l'adaptateur, puis valide et mappe explicitement vers les modèles métier. Ne parcours pas directement des `JsonElement` comme substitut à des DTO.
 - Maintiens la cible .NET 10 et privilégie les versions stables compatibles avec les frameworks et dépendances du dépôt.
