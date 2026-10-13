@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Njord.Core.Serialization;
+using Njord.Core.Retry;
 using Njord.DataProviders.Massive.Configuration;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Errors;
@@ -21,20 +22,20 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
 
     private readonly HttpClient _httpClient;
     private readonly MassiveDataProviderOptions _options;
-    private readonly MassiveRequestRateLimiter _rateLimiter;
+    private readonly RetryPolicy _retryPolicy;
     private readonly MassiveCircuitBreaker _circuitBreaker;
     private readonly TimeProvider _timeProvider;
 
     public MassiveAggregatesApiClient(
         IHttpClientFactory httpClientFactory,
         IOptions<MassiveDataProviderOptions> options,
-        MassiveRequestRateLimiter rateLimiter,
+        RetryPolicy retryPolicy,
         MassiveCircuitBreaker circuitBreaker,
         TimeProvider timeProvider)
     {
         _httpClient = httpClientFactory.CreateClient(HttpClientName);
         _options = options.Value;
-        _rateLimiter = rateLimiter;
+        _retryPolicy = retryPolicy;
         _circuitBreaker = circuitBreaker;
         _timeProvider = timeProvider;
     }
@@ -79,125 +80,133 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
         Uri requestUri,
         CancellationToken cancellationToken)
     {
-        for (var retry = 0; ; retry++)
+        try
         {
-            _circuitBreaker.ThrowIfOpen();
-            await _rateLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-            try
-            {
-                using var response = await SendAsync(requestUri, cancellationToken).ConfigureAwait(false);
-
-                var requestId = GetRequestId(response);
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
-                {
-                    _circuitBreaker.RecordSuccess();
-                    throw new MassiveRateLimitException(GetRetryAfter(response), requestId);
-                }
-
-                if (IsTransient(response.StatusCode))
-                {
-                    if (retry < _options.MaxRetryAttempts)
-                    {
-                        var retryAfter = GetRetryAfter(response);
-                        response.Dispose();
-                        await DelayBeforeRetryAsync(retry, retryAfter, cancellationToken).ConfigureAwait(false);
-                        continue;
-                    }
-
-                    _circuitBreaker.RecordTransientFailure();
-                    throw new MassiveDataProviderException(
-                        $"Massive returned transient HTTP status {(int)response.StatusCode}.",
-                        response.StatusCode,
-                        requestId);
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    _circuitBreaker.RecordSuccess();
-                    throw new MassiveDataProviderException(
-                        $"Massive returned HTTP status {(int)response.StatusCode}.",
-                        response.StatusCode,
-                        requestId);
-                }
-
-                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                MassiveAggregateResponseDto? result;
-                try
-                {
-                    result = json.Déserialize<MassiveAggregateResponseDto>();
-                }
-                catch (JsonException exception)
-                {
-                    _circuitBreaker.RecordSuccess();
-                    throw new MassiveDataProviderException(
-                        "Massive returned malformed aggregate JSON.",
-                        response.StatusCode,
-                        requestId,
-                        exception);
-                }
-
-                if (result is null)
-                {
-                    _circuitBreaker.RecordSuccess();
-                    throw new MassiveDataProviderException(
-                        "Massive returned an empty aggregate response.",
-                        response.StatusCode,
-                        requestId);
-                }
-
-                result.RequestId ??= requestId;
-                if (!string.Equals(result.Status, "OK", StringComparison.OrdinalIgnoreCase))
-                {
-                    _circuitBreaker.RecordSuccess();
-                    var detail = result.Error ?? result.Message ?? "The response status was not OK.";
-                    throw new MassiveDataProviderException(detail, response.StatusCode, result.RequestId);
-                }
-
-                _circuitBreaker.RecordSuccess();
-                return result;
-            }
-            catch (HttpRequestException exception)
-            {
-                if (retry < _options.MaxRetryAttempts)
-                {
-                    await DelayBeforeRetryAsync(retry, null, cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                _circuitBreaker.RecordTransientFailure();
-                throw new MassiveDataProviderException(
-                    "The Massive HTTP request failed after the configured retries.",
-                    innerException: exception);
-            }
-            catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
-            {
-                if (retry < _options.MaxRetryAttempts)
-                {
-                    await DelayBeforeRetryAsync(retry, null, cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                _circuitBreaker.RecordTransientFailure();
-                throw new MassiveDataProviderException(
-                    "The Massive HTTP request timed out after the configured retries.",
-                    innerException: exception);
-            }
+            return await _retryPolicy.ExecuteAsync(
+                token => SendPageAttemptAsync(requestUri, token),
+                exception => IsRetryable(exception, cancellationToken),
+                GetRetryAfter,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (MassiveTransientHttpException exception)
+        {
+            throw new MassiveDataProviderException(
+                $"Massive returned transient HTTP status {(int)exception.StatusCode}.",
+                exception.StatusCode,
+                exception.RequestId,
+                exception);
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new MassiveDataProviderException(
+                "The Massive HTTP request failed after the configured retries.",
+                innerException: exception);
+        }
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new MassiveDataProviderException(
+                "The Massive HTTP request timed out after the configured retries.",
+                innerException: exception);
         }
     }
 
-    private async Task DelayBeforeRetryAsync(
-        int retry,
-        TimeSpan? retryAfter,
+    private async Task<MassiveAggregateResponseDto> SendPageAttemptAsync(
+        Uri requestUri,
         CancellationToken cancellationToken)
     {
-        var exponentialTicks = _options.RetryBaseDelay.Ticks * Math.Pow(2, retry);
-        var delay = TimeSpan.FromTicks((long)Math.Min(exponentialTicks, _options.MaximumRetryDelay.Ticks));
-        if (retryAfter > delay)
-            delay = retryAfter.Value;
+        _circuitBreaker.ThrowIfOpen();
 
-        await Task.Delay(delay, _timeProvider, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            using var response = await SendAsync(requestUri, cancellationToken).ConfigureAwait(false);
+
+            var requestId = GetRequestId(response);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                _circuitBreaker.RecordSuccess();
+                throw new MassiveRateLimitException(GetRetryAfter(response), requestId);
+            }
+
+            if (IsTransient(response.StatusCode))
+            {
+                var exception = new MassiveTransientHttpException(
+                    response.StatusCode,
+                    requestId,
+                    GetRetryAfter(response));
+                _circuitBreaker.RecordTransientFailure();
+                throw exception;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _circuitBreaker.RecordSuccess();
+                throw new MassiveDataProviderException(
+                    $"Massive returned HTTP status {(int)response.StatusCode}.",
+                    response.StatusCode,
+                    requestId);
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            MassiveAggregateResponseDto? result;
+            try
+            {
+                result = json.Déserialize<MassiveAggregateResponseDto>();
+            }
+            catch (JsonException exception)
+            {
+                _circuitBreaker.RecordSuccess();
+                throw new MassiveDataProviderException(
+                    "Massive returned malformed aggregate JSON.",
+                    response.StatusCode,
+                    requestId,
+                    exception);
+            }
+
+            if (result is null)
+            {
+                _circuitBreaker.RecordSuccess();
+                throw new MassiveDataProviderException(
+                    "Massive returned an empty aggregate response.",
+                    response.StatusCode,
+                    requestId);
+            }
+
+            result.RequestId ??= requestId;
+            if (!string.Equals(result.Status, "OK", StringComparison.OrdinalIgnoreCase))
+            {
+                _circuitBreaker.RecordSuccess();
+                var detail = result.Error ?? result.Message ?? "The response status was not OK.";
+                throw new MassiveDataProviderException(detail, response.StatusCode, result.RequestId);
+            }
+
+            _circuitBreaker.RecordSuccess();
+            return result;
+        }
+        catch (HttpRequestException)
+        {
+            _circuitBreaker.RecordTransientFailure();
+            throw;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _circuitBreaker.RecordTransientFailure();
+            throw;
+        }
     }
+
+    private static bool IsRetryable(Exception exception, CancellationToken cancellationToken) =>
+        exception is MassiveRateLimitException ||
+        exception is MassiveTransientHttpException ||
+        exception is HttpRequestException ||
+        (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested);
+
+    private TimeSpan? GetRetryAfter(Exception exception) =>
+        exception switch
+        {
+            MassiveRateLimitException rateLimitException => rateLimitException.RetryAfter,
+            MassiveTransientHttpException transientException => transientException.RetryAfter,
+            _ => null
+        };
 
     #endregion
 

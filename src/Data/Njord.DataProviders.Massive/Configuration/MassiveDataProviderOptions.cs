@@ -14,20 +14,8 @@ public sealed class MassiveDataProviderOptions
     /// <summary>Gets or sets the API key from the local Massive configuration file.</summary>
     public string ApiKey { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the maximum request-start rate for the configured account.</summary>
-    public int RequestsPerMinute { get; set; } = 5;
-
     /// <summary>Gets or sets the timeout for an individual HTTP attempt.</summary>
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
-
-    /// <summary>Gets or sets the number of retries for transient GET failures.</summary>
-    public int MaxRetryAttempts { get; set; } = 2;
-
-    /// <summary>Gets or sets the base delay for exponential retry backoff.</summary>
-    public TimeSpan RetryBaseDelay { get; set; } = TimeSpan.FromMilliseconds(500);
-
-    /// <summary>Gets or sets the maximum exponential retry delay.</summary>
-    public TimeSpan MaximumRetryDelay { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Gets or sets the transient-failure threshold that opens the circuit.</summary>
     public int CircuitBreakerFailureThreshold { get; set; } = 5;

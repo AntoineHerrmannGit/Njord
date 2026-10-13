@@ -24,20 +24,8 @@ internal sealed class MassiveDataProviderOptionsValidator : IValidateOptions<Mas
         else if (options.ApiKey.Any(char.IsWhiteSpace))
             failures.Add("DataProviders:Massive:ApiKey must not contain whitespace.");
 
-        if (options.RequestsPerMinute <= 0)
-            failures.Add("DataProviders:Massive:RequestsPerMinute must be greater than zero.");
-
         if (options.RequestTimeout <= TimeSpan.Zero)
             failures.Add("DataProviders:Massive:RequestTimeout must be positive.");
-
-        if (options.MaxRetryAttempts is < 0 or > 10)
-            failures.Add("DataProviders:Massive:MaxRetryAttempts must be between zero and ten.");
-
-        if (options.RetryBaseDelay <= TimeSpan.Zero)
-            failures.Add("DataProviders:Massive:RetryBaseDelay must be positive.");
-
-        if (options.MaximumRetryDelay <= TimeSpan.Zero || options.MaximumRetryDelay < options.RetryBaseDelay)
-            failures.Add("DataProviders:Massive:MaximumRetryDelay must be positive and at least RetryBaseDelay.");
 
         if (options.CircuitBreakerFailureThreshold <= 0)
             failures.Add("DataProviders:Massive:CircuitBreakerFailureThreshold must be greater than zero.");

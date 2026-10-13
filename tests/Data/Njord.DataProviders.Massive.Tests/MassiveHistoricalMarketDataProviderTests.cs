@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Njord.Core.Retry;
 using Njord.DataProviders.Massive.Configuration;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Errors;
@@ -114,7 +115,7 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         var handler = new QueueHttpMessageHandler(
             new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             JsonResponse(StandardResponse));
-        var provider = CreateProvider(handler, options => options.RetryBaseDelay = TimeSpan.FromTicks(1));
+        var provider = CreateProvider(handler, retryBaseDelay: TimeSpan.FromTicks(1));
 
         var bars = await provider.GetHistoricalOhlcAsync(CreateRequest(MassiveAssetClass.Stock, "AAPL"));
 
@@ -123,12 +124,26 @@ public sealed class MassiveHistoricalMarketDataProviderTests
     }
 
     [Fact]
-    public async Task GetHistoricalOhlcAsync_ReportsRateLimitAndRetryAfter()
+    public async Task GetHistoricalOhlcAsync_RetriesRateLimitUsingServerRetryAfter()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromMilliseconds(1));
+        var handler = new QueueHttpMessageHandler(response, JsonResponse(StandardResponse));
+        var provider = CreateProvider(handler);
+
+        var bars = await provider.GetHistoricalOhlcAsync(CreateRequest(MassiveAssetClass.Stock, "AAPL"));
+
+        Assert.Single(bars);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task GetHistoricalOhlcAsync_ReportsRateLimitAfterRetryAttemptsAreExhausted()
     {
         var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
         response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(10));
         var handler = new QueueHttpMessageHandler(response);
-        var provider = CreateProvider(handler);
+        var provider = CreateProvider(handler, retryAttempts: 0);
 
         var exception = await Assert.ThrowsAsync<MassiveRateLimitException>(
             () => provider.GetHistoricalOhlcAsync(CreateRequest(MassiveAssetClass.Stock, "AAPL")));
@@ -143,11 +158,8 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         var handler = new QueueHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
         var provider = CreateProvider(
             handler,
-            options =>
-            {
-                options.MaxRetryAttempts = 0;
-                options.CircuitBreakerFailureThreshold = 1;
-            });
+            options => options.CircuitBreakerFailureThreshold = 1,
+            retryAttempts: 0);
         var request = CreateRequest(MassiveAssetClass.Stock, "AAPL");
 
         await Assert.ThrowsAsync<MassiveDataProviderException>(() => provider.GetHistoricalOhlcAsync(request));
@@ -265,7 +277,7 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         var options = new MassiveDataProviderOptions
         {
             BaseAddress = new Uri("https://api.massive.test/"),
-            RequestsPerMinute = 0
+            RequestTimeout = TimeSpan.Zero
         };
 
         var result = new MassiveDataProviderOptionsValidator().Validate(
@@ -275,7 +287,7 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         Assert.False(result.Succeeded);
         Assert.Contains(result.Failures!, failure =>
             failure.Contains("DataProviders:Massive:ApiKey", StringComparison.Ordinal));
-        Assert.Contains(result.Failures!, failure => failure.Contains("RequestsPerMinute", StringComparison.Ordinal));
+        Assert.Contains(result.Failures!, failure => failure.Contains("RequestTimeout", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -285,7 +297,11 @@ public sealed class MassiveHistoricalMarketDataProviderTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DataProviders:Massive:BaseAddress"] = "https://api.massive.test/",
-                ["DataProviders:Massive:ApiKey"] = "configured-test-key"
+                ["DataProviders:Massive:ApiKey"] = "configured-test-key",
+                ["DataProviders:Massive:Retry:Pattern"] = "Linear",
+                ["DataProviders:Massive:Retry:MaxRetryAttempts"] = "3",
+                ["DataProviders:Massive:Retry:BaseDelay"] = "00:00:00.250",
+                ["DataProviders:Massive:Retry:MaximumDelay"] = "00:00:05"
             })
             .Build();
         var services = new ServiceCollection();
@@ -293,8 +309,14 @@ public sealed class MassiveHistoricalMarketDataProviderTests
 
         using var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<MassiveDataProviderOptions>>().Value;
+        var retryOptions = serviceProvider.GetRequiredService<IOptions<RetryPolicyOptions>>().Value;
 
         Assert.Equal("configured-test-key", options.ApiKey);
+        Assert.Equal(RetryDelayPattern.Linear, retryOptions.Pattern);
+        Assert.Equal(3, retryOptions.MaxRetryAttempts);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), retryOptions.BaseDelay);
+        Assert.Equal(TimeSpan.FromSeconds(5), retryOptions.MaximumDelay);
+        Assert.NotNull(serviceProvider.GetRequiredService<RetryPolicy>());
     }
 
     #endregion
@@ -341,29 +363,33 @@ public sealed class MassiveHistoricalMarketDataProviderTests
 
     private static MassiveHistoricalMarketDataProvider CreateProvider(
         QueueHttpMessageHandler handler,
-        Action<MassiveDataProviderOptions>? configure = null)
+        Action<MassiveDataProviderOptions>? configure = null,
+        int retryAttempts = 1,
+        TimeSpan? retryBaseDelay = null)
     {
         var options = new MassiveDataProviderOptions
         {
             BaseAddress = new Uri("https://api.massive.test/"),
             ApiKey = "test-api-key",
-            RequestsPerMinute = 60_000,
             RequestTimeout = TimeSpan.FromSeconds(5),
-            MaxRetryAttempts = 1,
-            RetryBaseDelay = TimeSpan.FromMilliseconds(1),
-            MaximumRetryDelay = TimeSpan.FromSeconds(1),
             CircuitBreakerFailureThreshold = 5,
             CircuitBreakerBreakDuration = TimeSpan.FromSeconds(1),
             MaximumPagesPerQuery = 10
         };
         configure?.Invoke(options);
+        var retryOptions = new RetryPolicyOptions
+        {
+            MaxRetryAttempts = retryAttempts,
+            BaseDelay = retryBaseDelay ?? TimeSpan.FromMilliseconds(1),
+            MaximumDelay = TimeSpan.FromSeconds(1)
+        };
 
         var providerOptions = Options.Create(options);
         var timeProvider = TimeProvider.System;
         var apiClient = new MassiveAggregatesApiClient(
             new StubHttpClientFactory(handler),
             providerOptions,
-            new MassiveRequestRateLimiter(providerOptions, timeProvider),
+            new RetryPolicy(Options.Create(retryOptions), timeProvider),
             new MassiveCircuitBreaker(providerOptions, timeProvider),
             timeProvider);
         return new MassiveHistoricalMarketDataProvider(apiClient, new MassiveOhlcMapper());

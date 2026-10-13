@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Core\Njord.Core.Serialization\Njord.Core.Serialization.csproj" />
+    <ProjectReference Include="..\..\Core\Njord.Core.Retry\Njord.Core.Retry.csproj" />
     <ProjectReference Include="..\..\Models\Njord.Models\Njord.Models.csproj" />
   </ItemGroup>
 

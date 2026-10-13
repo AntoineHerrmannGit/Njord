@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Njord.Core.Retry;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Mapping;
 using Njord.DataProviders.Massive.Provider;
@@ -26,6 +27,10 @@ public static class MassiveDataProviderServiceCollectionExtensions
         services.AddOptions<MassiveDataProviderOptions>()
             .Bind(configuration.GetSection(MassiveDataProviderOptions.SectionName))
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<RetryPolicyOptions>, RetryPolicyOptionsValidator>();
+        services.AddOptions<RetryPolicyOptions>()
+            .Bind(configuration.GetSection($"{MassiveDataProviderOptions.SectionName}:Retry"))
+            .ValidateOnStart();
 
         services.AddHttpClient(MassiveAggregatesApiClient.HttpClientName, (serviceProvider, client) =>
         {
@@ -36,13 +41,13 @@ public static class MassiveDataProviderServiceCollectionExtensions
         });
 
         services.TryAddSingleton(TimeProvider.System);
-        services.AddSingleton<MassiveRequestRateLimiter>();
         services.AddSingleton<MassiveCircuitBreaker>();
+        services.AddSingleton<RetryPolicy>();
         services.AddTransient<IMassiveAggregatesApiClient>(serviceProvider =>
             new MassiveAggregatesApiClient(
                 serviceProvider.GetRequiredService<IHttpClientFactory>(),
                 serviceProvider.GetRequiredService<IOptions<MassiveDataProviderOptions>>(),
-                serviceProvider.GetRequiredService<MassiveRequestRateLimiter>(),
+                serviceProvider.GetRequiredService<RetryPolicy>(),
                 serviceProvider.GetRequiredService<MassiveCircuitBreaker>(),
                 serviceProvider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IMassiveOhlcMapper, MassiveOhlcMapper>();
