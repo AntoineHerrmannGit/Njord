@@ -1,4 +1,4 @@
-namespace Njord.Core.EnumerableExtensions;
+namespace Njord.Core.Extensions;
 
 /// <summary>Provides simple null and emptiness checks for enumerable sequences.</summary>
 public static class EnumerableExtensions

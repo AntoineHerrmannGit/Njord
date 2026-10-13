@@ -1,6 +1,6 @@
-using Njord.Core.EnumerableExtensions;
+using Njord.Core.Extensions;
 
-namespace Njord.Core.EnumerableExtensions.Tests;
+namespace Njord.Core.Extensions.Tests;
 
 public sealed class EnumerableExtensionsTests
 {

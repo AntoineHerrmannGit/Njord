@@ -1,7 +1,8 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/Core/">
-    <Project Path="src/Core/Njord.Core.EnumerableExtensions/Njord.Core.EnumerableExtensions.csproj" />
+    <Project Path="src/Core/Njord.Core.Extensions/Njord.Core.Extensions.csproj" />
+    <Project Path="src/Core/Njord.Core.Retry/Njord.Core.Retry.csproj" />
     <Project Path="src/Core/Njord.Core.Serialization/Njord.Core.Serialization.csproj" />
   </Folder>
   <Folder Name="/src/Data/">
@@ -12,7 +13,8 @@
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Core/">
-    <Project Path="tests/Core/Njord.Core.EnumerableExtensions.Tests/Njord.Core.EnumerableExtensions.Tests.csproj" />
+    <Project Path="tests/Core/Njord.Core.Extensions.Tests/Njord.Core.Extensions.Tests.csproj" />
+    <Project Path="tests/Core/Njord.Core.Retry.Tests/Njord.Core.Retry.Tests.csproj" />
     <Project Path="tests/Core/Njord.Core.Serialization.Tests/Njord.Core.Serialization.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Data/">

@@ -1,4 +1,4 @@
-# Njord.Core.EnumerableExtensions
+# Njord.Core.Extensions
 
 Small, provider-neutral helpers for checking whether an `IEnumerable<T>` is empty, non-empty, or null.
 

@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Core\Njord.Core.EnumerableExtensions\Njord.Core.EnumerableExtensions.csproj" />
+    <ProjectReference Include="..\..\..\src\Core\Njord.Core.Extensions\Njord.Core.Extensions.csproj" />
   </ItemGroup>
 
 </Project>
