@@ -4,6 +4,8 @@ Ce dossier rassemble le contexte produit et les consignes réutilisables pour fa
 
 Toutes les modifications doivent conserver .NET 10 comme cible et privilégier les versions stables NuGet les plus récentes compatibles. La procédure de mise à jour et de validation est définie dans [EngineeringPractices.md](./EngineeringPractices.md).
 
+L'utilisation de `Semaphore` et `SemaphoreSlim` est interdite dans toute l'application, ses projets et ses tests. Pour les détails et les mécanismes à privilégier, voir la section architecture de [EngineeringPractices.md](./EngineeringPractices.md).
+
 ## Documents de référence
 
 - [BusinessContext.md](./BusinessContext.md) est la source de vérité pour les objectifs métier, les fonctionnalités attendues et les contraintes formulées dans le cahier des charges.
