@@ -8,6 +8,9 @@ public sealed class RetryPolicyOptions
     /// <summary>Gets the number of retries after the initial attempt.</summary>
     public required int MaxRetryAttempts { get; init; }
 
+    /// <summary>Gets the delay growth pattern applied between retries.</summary>
+    public RetryDelayPattern Pattern { get; init; } = RetryDelayPattern.Exponential;
+
     /// <summary>Gets the delay before the first retry.</summary>
     public required TimeSpan BaseDelay { get; init; }
 

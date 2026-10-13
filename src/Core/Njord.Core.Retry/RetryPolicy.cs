@@ -1,34 +1,30 @@
+using Microsoft.Extensions.Options;
+
 namespace Njord.Core.Retry;
 
-/// <summary>Executes asynchronous operations with bounded retries and exponential delays.</summary>
+/// <summary>Executes asynchronous operations with bounded retries and configurable delay patterns.</summary>
 public sealed class RetryPolicy
 {
     #region Policy configuration
 
     private readonly int _maxRetryAttempts;
+    private readonly RetryDelayPattern _pattern;
     private readonly TimeSpan _baseDelay;
     private readonly TimeSpan _maximumDelay;
     private readonly TimeProvider _timeProvider;
 
-    public RetryPolicy(RetryPolicyOptions options, TimeProvider timeProvider)
+    public RetryPolicy(IOptions<RetryPolicyOptions> options, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
-        if (options.MaxRetryAttempts < 0)
-            throw new ArgumentOutOfRangeException(nameof(options), "MaxRetryAttempts cannot be negative.");
+        if (!Enum.IsDefined(options.Value.Pattern))
+            throw new ArgumentOutOfRangeException(nameof(options), "Pattern must be a defined retry delay pattern.");
 
-        if (options.BaseDelay <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(options), "BaseDelay must be positive.");
-
-        if (options.MaximumDelay < options.BaseDelay)
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "MaximumDelay must be greater than or equal to BaseDelay.");
-
-        _maxRetryAttempts = options.MaxRetryAttempts;
-        _baseDelay = options.BaseDelay;
-        _maximumDelay = options.MaximumDelay;
+        _maxRetryAttempts = options.Value.MaxRetryAttempts;
+        _pattern = options.Value.Pattern;
+        _baseDelay = options.Value.BaseDelay;
+        _maximumDelay = options.Value.MaximumDelay;
         _timeProvider = timeProvider;
     }
 
@@ -74,6 +70,21 @@ public sealed class RetryPolicy
 
     private TimeSpan GetDelay(int retryCount, TimeSpan? retryAfter)
     {
+        var delay = _pattern switch
+        {
+            RetryDelayPattern.Exponential => GetExponentialDelay(retryCount),
+            RetryDelayPattern.Linear => GetLinearDelay(retryCount),
+            _ => throw new InvalidOperationException($"Unsupported retry delay pattern: {_pattern}.")
+        };
+
+        if (retryAfter > delay)
+            delay = retryAfter.Value;
+
+        return delay;
+    }
+
+    private TimeSpan GetExponentialDelay(int retryCount)
+    {
         var delay = _baseDelay;
         for (var retry = 0; retry < retryCount && delay < _maximumDelay; retry++)
         {
@@ -82,13 +93,17 @@ public sealed class RetryPolicy
                 : TimeSpan.FromTicks(delay.Ticks * 2);
         }
 
-        if (delay > _maximumDelay)
-            delay = _maximumDelay;
+        return delay > _maximumDelay ? _maximumDelay : delay;
+    }
 
-        if (retryAfter > delay)
-            delay = retryAfter.Value;
+    private TimeSpan GetLinearDelay(int retryCount)
+    {
+        var multiplier = (long)retryCount + 1;
+        if (_baseDelay.Ticks > _maximumDelay.Ticks / multiplier)
+            return _maximumDelay;
 
-        return delay;
+        var delay = TimeSpan.FromTicks(_baseDelay.Ticks * multiplier);
+        return delay > _maximumDelay ? _maximumDelay : delay;
     }
 
     #endregion

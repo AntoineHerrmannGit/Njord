@@ -1,4 +1,5 @@
 using Njord.Core.Retry;
+using Microsoft.Extensions.Options;
 
 namespace Njord.Core.Retry.Tests;
 
@@ -90,18 +91,77 @@ public sealed class RetryPolicyTests
         Assert.Equal(1, attemptCount);
     }
 
+    [Theory]
+    [InlineData(RetryDelayPattern.Exponential, 700)]
+    [InlineData(RetryDelayPattern.Linear, 600)]
+    public async Task ExecuteAsync_AppliesConfiguredDelayPattern(
+        RetryDelayPattern pattern,
+        int expectedMinimumElapsedMilliseconds)
+    {
+        var policy = CreatePolicy(
+            pattern,
+            baseDelay: TimeSpan.FromMilliseconds(100),
+            maximumDelay: TimeSpan.FromSeconds(1),
+            maxRetryAttempts: 3);
+        var attemptCount = 0;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        await policy.ExecuteAsync(
+            _ =>
+            {
+                attemptCount++;
+                return attemptCount < 4
+                    ? Task.FromException<int>(new HttpRequestException())
+                    : Task.FromResult(1);
+            },
+            exception => exception is HttpRequestException,
+            _ => null);
+
+        Assert.Equal(4, attemptCount);
+        Assert.True(stopwatch.ElapsedMilliseconds >= expectedMinimumElapsedMilliseconds);
+    }
+
+    [Fact]
+    public void RetryPolicyOptionsValidator_RejectsUndefinedPattern()
+    {
+        var options = new RetryPolicyOptions
+        {
+            MaxRetryAttempts = 2,
+            Pattern = (RetryDelayPattern)99,
+            BaseDelay = TimeSpan.FromMilliseconds(1),
+            MaximumDelay = TimeSpan.FromSeconds(1)
+        };
+
+        var result = new RetryPolicyOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Failures!, failure => failure.Contains("Pattern", StringComparison.Ordinal));
+    }
+
     #endregion
 
     #region Test helpers
 
     private static RetryPolicy CreatePolicy() =>
+        CreatePolicy(
+            RetryDelayPattern.Exponential,
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(5),
+            maxRetryAttempts: 2);
+
+    private static RetryPolicy CreatePolicy(
+        RetryDelayPattern pattern,
+        TimeSpan baseDelay,
+        TimeSpan maximumDelay,
+        int maxRetryAttempts) =>
         new(
-            new RetryPolicyOptions
+            Options.Create(new RetryPolicyOptions
             {
-                MaxRetryAttempts = 2,
-                BaseDelay = TimeSpan.FromMilliseconds(1),
-                MaximumDelay = TimeSpan.FromMilliseconds(5)
-            },
+                MaxRetryAttempts = maxRetryAttempts,
+                Pattern = pattern,
+                BaseDelay = baseDelay,
+                MaximumDelay = maximumDelay
+            }),
             TimeProvider.System);
 
     #endregion
