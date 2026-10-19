@@ -2,6 +2,7 @@
   <Folder Name="/src/" />
   <Folder Name="/src/Core/">
     <Project Path="src/Core/Njord.Core.Extensions/Njord.Core.Extensions.csproj" />
+    <Project Path="src/Core/Njord.Core.FileManagement/Njord.Core.FileManagement.csproj" Id="4126dae6-9c36-4d88-8e4d-e5527d8ff8e1" />
     <Project Path="src/Core/Njord.Core.Retry/Njord.Core.Retry.csproj" />
     <Project Path="src/Core/Njord.Core.Serialization/Njord.Core.Serialization.csproj" />
   </Folder>

@@ -14,7 +14,7 @@ This project retrieves historical OHLC bars. It does not retrieve standalone spo
 
 ## Configuration and credentials
 
-Copy `massive.settings.example.json` to the host's `massive.settings.local.json` and set `DataProviders:Massive:ApiKey` in that local file. The provider binds all its options, including the API key, from the `DataProviders:Massive` section supplied through DI; it does not read environment variables. The local file is excluded from Git. Restrict its filesystem permissions so only the application user can read it, and never paste the key into source, logs, or chat. For CI/CD, provide the JSON configuration as a protected secret file and make it available to the application at runtime; do not commit it or pass the credential through environment variables.
+Copy `massive.settings.example.json` to the host's `massive.settings.json` and set `DataProviders:Massive:ApiKey` in that local file. The provider binds all its options, including the API key, from the `DataProviders:Massive` section supplied through DI; it does not read environment variables. The local file is excluded from Git. Restrict its filesystem permissions so only the application user can read it, and never paste the key into source, logs, or chat. For CI/CD, provide the JSON configuration as a protected secret file and make it available to the application at runtime; do not commit it or pass the credential through environment variables.
 
 HTTP 429 responses and transient network/server failures use the shared retry policy in `Njord.Core.Retry`. The `DataProviders:Massive:Retry:Pattern` setting selects `Exponential` or `Linear` backoff; delays are capped by `MaximumDelay` and extended when Massive supplies a larger `Retry-After` value. The provider surfaces `MassiveRateLimitException` if the rate limit remains exceeded after the configured attempts. Repeated transient server/network failures open a circuit breaker. Timeout, retry, breaker, and page-count options are validated at application startup.
 
@@ -22,7 +22,7 @@ Register the provider with the host's `IConfiguration`:
 
 ```csharp
 builder.Configuration.AddJsonFile(
-    "massive.settings.local.json",
+    "massive.settings.json",
     optional: false,
     reloadOnChange: false);
 

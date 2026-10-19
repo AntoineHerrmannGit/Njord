@@ -9,11 +9,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
-    <None Update="massive.settings.example.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="massive.settings.local.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Core\Njord.Core.FileManagement\Njord.Core.FileManagement.csproj" />
     <ProjectReference Include="..\..\..\src\Data\Njord.DataProviders.Massive\Njord.DataProviders.Massive.csproj" />
   </ItemGroup>
 

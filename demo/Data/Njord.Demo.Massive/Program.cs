@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Njord.Core.FileManagement;
 using Njord.DataProviders.Massive.Configuration;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Errors;
@@ -14,12 +15,6 @@ internal static class Program
     private static async Task<int> Main(string[] args)
     {
         var configurationPath = FindConfigurationPath();
-        if (configurationPath is null)
-        {
-            Console.Error.WriteLine(
-                "Configuration Massive absente. Copiez massive.settings.example.json vers massive.settings.local.json dans le dossier du projet, puis renseignez ApiKey.");
-            return 1;
-        }
 
         if (!TryReadRequest(args, out var ticker, out var from, out var to))
         {
@@ -95,20 +90,8 @@ internal static class Program
 
     #region Input and configuration
 
-    private static string? FindConfigurationPath()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            var localPath = Path.Combine(directory.FullName, "massive.settings.local.json");
-            if (File.Exists(localPath))
-                return localPath;
-
-            directory = directory.Parent;
-        }
-
-        return null;
-    }
+    private static string FindConfigurationPath()
+        => FileManager.FindFile("massive.settings.json");
 
     private static bool TryReadRequest(
         IReadOnlyList<string> args,

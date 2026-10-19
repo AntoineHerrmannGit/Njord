@@ -172,7 +172,8 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
             }
 
             result.RequestId ??= requestId;
-            if (!string.Equals(result.Status, "OK", StringComparison.OrdinalIgnoreCase))
+            if (!(result.Status == "OK"
+             || result.Status == "DELAYED"))
             {
                 _circuitBreaker.RecordSuccess();
                 var detail = result.Error ?? result.Message ?? "The response status was not OK.";
