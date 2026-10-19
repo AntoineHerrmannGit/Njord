@@ -11,6 +11,18 @@
   <Folder Name="/src/Models/">
     <Project Path="src/Models/Njord.Models/Njord.Models.csproj" />
   </Folder>
+  <Folder Name="/demo/" />
+  <Folder Name="/demo/Core/">
+    <Project Path="demo/Core/Njord.Demo.Extensions/Njord.Demo.Extensions.csproj" />
+    <Project Path="demo/Core/Njord.Demo.Retry/Njord.Demo.Retry.csproj" />
+    <Project Path="demo/Core/Njord.Demo.Serialization/Njord.Demo.Serialization.csproj" />
+  </Folder>
+  <Folder Name="/demo/Data/">
+    <Project Path="demo/Data/Njord.Demo.Massive/Njord.Demo.Massive.csproj" />
+  </Folder>
+  <Folder Name="/demo/Models/">
+    <Project Path="demo/Models/Njord.Demo.Models/Njord.Demo.Models.csproj" />
+  </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Core/">
     <Project Path="tests/Core/Njord.Core.Extensions.Tests/Njord.Core.Extensions.Tests.csproj" />

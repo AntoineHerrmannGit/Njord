@@ -60,6 +60,10 @@ Les capacités plus larges de la vision — application WPF et dashboards, créa
 
 Cette distinction est importante pour un acquéreur potentiel : le dépôt démontre une direction produit et des composants de fondation, mais ne revendique pas aujourd'hui la disponibilité commerciale ni la livraison de l'ensemble de ces fonctionnalités.
 
+## Démonstrations et démarrage développeur
+
+Le répertoire [`demo/`](demo/README.md) contient des projets console autonomes montrant comment utiliser les modules déjà présents : sérialisation, extensions, retry, modèles financiers et connecteur historique Massive. Les démos locales s'exécutent avec des données d'exemple ; celle de Massive interroge réellement le fournisseur et nécessite une configuration locale ainsi qu'un accès réseau. Elles sont conçues comme exemples de prise en main, pas comme substitut aux futures interfaces GUI et dashboards.
+
 ## Intérêt potentiel pour un acquéreur
 
 Njord peut constituer une base de travail pour une organisation souhaitant développer un environnement propriétaire d'analyse et de backtesting, avec une séparation claire entre domaine financier et intégrations techniques. Selon les besoins de l'acquéreur, la suite du développement pourrait prioriser un univers d'actifs, des fournisseurs, des workflows et des modèles particuliers, puis les valider dans un périmètre métier mesurable.

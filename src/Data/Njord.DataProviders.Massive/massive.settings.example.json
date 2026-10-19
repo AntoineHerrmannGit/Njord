@@ -2,7 +2,7 @@
   "DataProviders": {
     "Massive": {
       "BaseAddress": "https://api.massive.com/",
-      "ApiKey": "",
+      "ApiKey": "72u25s5oyclL8QBF1sXBe0zbtVPX6L5A",
       "RequestTimeout": "00:00:30",
       "Retry": {
         "Pattern": "Exponential",
