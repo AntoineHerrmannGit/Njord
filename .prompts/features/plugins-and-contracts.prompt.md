@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis examine les projets, contrats d'extension, mécanismes de découverte et packages déjà présents.
 
+Applique la philosophie vectorielle des pratiques communes aux contrats de plugins : accepter et retourner des lots d'informations lorsque le cas métier porte sur plusieurs éléments, avec identité et diagnostic conservés par élément.
+
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : concentre le changement sur le point d'extension demandé, identifie tous ses consommateurs et demande confirmation avant de changer un contrat partagé, la stratégie de versionnement ou l'architecture de découverte avec un impact sur les plugins existants.
 
 Les projets hôtes et contrats restent ciblés sur .NET 10 et les packages NuGet MEF/extension doivent être aux versions stables les plus récentes compatibles. Mets à jour les dépendances directement concernées si besoin ; si la dernière version reste incompatible avec les contraintes de plugins, utilise la plus récente version compatible et documente les conséquences.

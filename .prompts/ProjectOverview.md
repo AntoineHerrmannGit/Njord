@@ -6,6 +6,8 @@ Toutes les modifications doivent conserver .NET 10 comme cible et privilégier l
 
 L'utilisation de `Semaphore` et `SemaphoreSlim` est interdite dans toute l'application, ses projets et ses tests. Pour les détails et les mécanismes à privilégier, voir la section architecture de [EngineeringPractices.md](./EngineeringPractices.md).
 
+Le produit adopte une philosophie de traitement vectoriel : les flux portant sur plusieurs instruments, données, requêtes de pricing ou scénarios de backtest doivent être décrits et consommés comme des lots, tandis que les détails de dispatch restent internes. La règle complète et ses limites sont définies dans [EngineeringPractices.md](./EngineeringPractices.md).
+
 ## Documents de référence
 
 - [BusinessContext.md](./BusinessContext.md) est la source de vérité pour les objectifs métier, les fonctionnalités attendues et les contraintes formulées dans le cahier des charges.

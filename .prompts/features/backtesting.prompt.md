@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis examine le moteur, les contrats de stratégie, les événements et la persistance existants.
 
+Applique la philosophie de traitement vectoriel des pratiques communes : représenter et traiter les ensembles de scénarios, stratégies et instruments comme des lots identifiés ; conserver les résultats et erreurs par scénario sans imposer un dispatch scalaire au consommateur.
+
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : garde le changement aussi local que possible, suis le parcours complet stratégie → replay → exécution → résultats/persistance → GUI, et demande confirmation avant de changer l'architecture ou les contrats partagés du moteur ou d'étendre son impact global.
 
 Maintiens les projets en .NET 10. Pour les packages NuGet du moteur, de sérialisation ou d'exécution concernés par le changement, choisis la dernière version stable compatible ; mets à jour les dépendances nécessaires si elle ne convient pas, et documente le recours à la version stable la plus récente compatible si l'obstacle demeure.

@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis examine l'organisation réelle des tests et de la documentation. Reste dans le périmètre demandé ; ce prompt ne remplace pas le prompt de fonctionnalité qui définit le comportement à tester.
 
+Vérifie la philosophie vectorielle des pratiques communes : les tests métier couvrent les comportements de lot (requêtes, instruments, scénarios et résultats) ainsi que l'identité, l'ordre et le traitement des erreurs par élément.
+
 Applique le cadrage de portée et d'impact des pratiques communes : n'élargis pas le périmètre de tests ou de documentation à d'autres fonctionnalités sans nécessité, mais vérifie et mets à jour toute documentation/test directement affecté par un changement accepté.
 
 Les projets et outils de test doivent rester compatibles avec .NET 10. Pour les packages NuGet de test, documentation ou build touchés, privilégie la dernière version stable compatible ; mets à jour les dépendances concernées pour résoudre une incompatibilité et documente le choix de la version stable la plus récente compatible si la dernière version ne peut pas être retenue.

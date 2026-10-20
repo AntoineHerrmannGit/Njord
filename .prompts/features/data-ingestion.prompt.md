@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis d'abord [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis examine le dépôt avant de modifier le code. Implémente uniquement le périmètre demandé par l'utilisateur et ses prérequis immédiats.
 
+Applique la philosophie de traitement vectoriel définie dans les pratiques communes : les requêtes et résultats d'ingestion prennent en charge des lots de tickers/données, et le dispatch par ticker ou classe d'actif reste interne au workflow et aux adaptateurs.
+
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : garde le changement aussi local que possible, suis ses appelants et consommateurs, et demande confirmation avant de modifier l'architecture d'ingestion ou de toucher un comportement global/transversal non explicitement demandé. Adapte ensuite les usages affectés dans le périmètre accepté.
 
 La solution cible .NET 10. Pour les packages NuGet utilisés ou ajoutés dans ce périmètre, utilise la dernière version stable compatible ; mets à jour les dépendances concernées pour résoudre une incompatibilité et, si la dernière version reste impraticable, conserve la version stable la plus récente compatible en documentant pourquoi.

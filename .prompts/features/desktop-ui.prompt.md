@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis examine le framework desktop, le modèle de présentation et les bibliothèques de visualisation déjà utilisés dans le dépôt.
 
+Applique la philosophie vectorielle des pratiques communes à l'expérience utilisateur : permettre de visualiser, sélectionner et lancer les workflows sur des ensembles d'instruments, séries, requêtes ou scénarios plutôt que de limiter l'interface aux opérations unitaires.
+
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : garde le changement au plus près de l'écran/flux demandé, suis ses interactions avec services métier, navigation et données, et demande confirmation avant de modifier le framework WPF, l'architecture UI partagée ou un comportement global de navigation.
 
 Le projet WPF doit cibler .NET 10 avec un TFM Windows adapté, généralement `net10.0-windows`. Pour WPF, AvalonEdit et les bibliothèques de graphiques, privilégie les dernières versions stables compatibles avec ce TFM ; mets à jour les dépendances directement concernées pour résoudre les incompatibilités, sinon utilise la plus récente version compatible et documente la limite. N'introduis pas de préversions sans demande explicite.

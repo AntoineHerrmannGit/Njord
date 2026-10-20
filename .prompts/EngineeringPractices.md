@@ -41,6 +41,15 @@ Respecter l'organisation et l'ordre de développement indicatifs décrits dans [
 
 ## 4. Architecture et code
 
+### Philosophie de traitement vectoriel
+
+- Gérer par défaut les informations sous forme de collections ou de lots cohérents dès qu'un même flux métier concerne plusieurs instruments, dates, requêtes, observations, courbes, scénarios ou résultats. Concevoir les contrats publics pour exprimer ce lot directement, plutôt que d'obliger les appelants à lancer une suite d'opérations scalaires.
+- Appliquer ce principe à tout le produit : ingestion et market data, requêtes de pricing, jeux de scénarios, simulation et résultats de backtest, persistance/cache, scripting, plugins, observabilité et interface.
+- Garder le dispatch technique interne aux adaptateurs et workflows. Par exemple, un connecteur peut répartir un lot par symbole, classe d'actif ou endpoint fournisseur sans exposer cette mécanique à l'appelant ; le référentiel demeure l'autorité pour les identifiants canoniques, les fournisseurs, les classes d'actifs et leurs périodes de validité.
+- Préserver l'identité, l'ordre, les unités, les timestamps et la provenance de chaque élément. Définir explicitement l'échec du lot et les diagnostics par élément ; ne pas ignorer silencieusement les entrées invalides ou non résolues.
+- Un lot ne signifie pas un calcul SIMD, une exécution parallèle ni un batch sans limite. Respecter les contraintes métier, les quotas fournisseurs, l'annulation et les limites de ressources ; ne paralléliser que si le comportement et ses garanties sont adaptés et testés.
+- Utiliser une opération scalaire uniquement lorsqu'elle est intrinsèque au domaine ou imposée par une frontière technique ; documenter ce motif et offrir une surface vectorielle aux consommateurs lorsqu'ils traitent plusieurs éléments.
+
 - Respecter l'architecture, les noms, le formatage et les helpers existants.
 - L'usage de `Semaphore` et `SemaphoreSlim` est interdit dans toute l'application, tous ses projets et ses tests, y compris via un helper ou une bibliothèque qui les emploie pour la synchronisation. Ne pas utiliser `Wait`, `WaitAsync` ou `Release` sur ces primitives. Pour respecter une limite d'appels distante, utiliser une politique de retry avec délai et annulation, pas un sémaphore ou un verrou de cadence ; pour les autres besoins de coordination, choisir un mécanisme sans sémaphore adapté au flux et documenter ses garanties.
 - Pour les structures de contrôle dont le langage autorise un corps sans accolades (`if`, `else`, `for`, `foreach`, `while`), omettre les accolades lorsque le corps contient une seule instruction. Placer la condition et l'instruction sur des lignes distinctes, avec l'instruction indentée sous la condition ; ne pas écrire de code compact sur une seule ligne.

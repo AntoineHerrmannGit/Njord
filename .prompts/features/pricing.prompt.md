@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md). Inspecte les contrats, modèles numériques, conventions financières et tests existants avant de coder.
 
+Applique la philosophie de traitement vectoriel des pratiques communes : les contrats de pricing acceptent des ensembles cohérents de requêtes et de scénarios et conservent un résultat identifiable par élément, sans forcer les appelants à orchestrer les cas scalaires.
+
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : conserve la modification dans le modèle/responsabilité demandés, examine ses consommateurs et demande confirmation avant de changer les contrats ou l'architecture de pricing, ou d'affecter le comportement d'autres fonctionnalités.
 
 La cible reste .NET 10. Utilise la dernière version stable compatible des packages NuGet nécessaires aux calculs ou tests concernés ; mets à jour les dépendances pertinentes pour lever une incompatibilité et documente toute contrainte qui impose une version compatible plus ancienne.

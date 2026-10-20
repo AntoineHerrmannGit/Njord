@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis inspecte les projets, modèles, migrations et tests existants. Traite uniquement le stockage concerné par la demande.
 
+Applique la philosophie vectorielle des pratiques communes : les contrats de persistance et de cache prennent en charge les lots de données, clés ou résultats lorsqu'ils sont naturellement traités ensemble, en préservant ordre, identité et erreurs par élément.
+
 Pour créer ou modifier les fichiers de configuration fonctionnels, suis également [le prompt de configuration spécialisée](./feature-configuration.prompt.md).
 
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : garde le changement aussi local que possible, suis les contrats consommateurs et les effets sur les fonctionnalités, et demande confirmation avant de modifier l'architecture de persistance ou un schéma/contrat partagé avec un impact global non explicitement demandé. Après accord, adapte tous les usages directement affectés dans le périmètre accepté.

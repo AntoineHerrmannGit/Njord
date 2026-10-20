@@ -23,6 +23,7 @@ Le cahier des charges ne définit pas encore les profils d'utilisateurs, les rè
 
 ### Données de marché et ingestion
 
+- Traiter les demandes et résultats portant sur plusieurs tickers, instruments et périodes comme des lots ; le dispatch par ticker ou classe d'actif reste interne aux workflows et adaptateurs.
 - Connecteurs REST pluggables, notamment Massive/Polygon et Yahoo Finance.
 - Import et parsing de fichiers CSV et Parquet.
 - Normalisation des symbologies et usage d'un ticker unique en mode référentiel.
@@ -35,6 +36,8 @@ Le cahier des charges ne définit pas encore les profils d'utilisateurs, les rè
 Les formats détaillés, les champs canoniques, les règles de résolution des symboles, les politiques de correction des données et les conditions d'utilisation des fournisseurs restent à définir si le dépôt ne les établit pas déjà.
 
 ### Pricing et données de marché dérivées
+
+Les demandes de pricing doivent pouvoir représenter des ensembles cohérents d'instruments, de dates et de scénarios ; les consommateurs ne doivent pas devoir orchestrer des appels scalaires indépendants.
 
 Les contrats envisagés sont `IPricingEngine`, `ICurveProvider` et `IVolSurfaceProvider`.
 
@@ -50,6 +53,7 @@ Ne pas appliquer un modèle à un instrument sans vérifier ses hypothèses et l
 
 ### Stratégies et backtesting
 
+- Les scénarios et ensembles d'entrées d'un backtest sont vectoriels : conserver leur identité et leurs résultats par élément, sans imposer au consommateur un dispatch scalaire.
 - Contrat de stratégie `IStrategy`.
 - Rejeu historique événementiel, convenant aux stratégies systématiques comme aux simulations au carnet d'ordres.
 - Simulation du slippage, des frais et de la latence.

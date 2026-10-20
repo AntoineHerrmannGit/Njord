@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis inspecte la configuration, l'authentification, les secrets, l'audit et les fournisseurs de télémétrie déjà utilisés.
 
+Respecte la philosophie vectorielle des pratiques communes : instrumenter les opérations et lots comme unités corrélées, sans créer un appel public ou un événement à haute fréquence par élément ; conserver les diagnostics utiles au niveau du lot et par élément.
+
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : limite le changement au contrôle ou à l'opération demandée, suis ses interactions avec les fonctions qui l'utilisent et demande confirmation avant de changer une politique transversale de sécurité, d'audit ou de collecte.
 
 Maintiens les projets en .NET 10. Pour les packages NuGet de sécurité, logging, OpenTelemetry et export Prometheus touchés, utilise la dernière version stable compatible ; mets à jour les dépendances associées si cela résout le problème, et documente toute contrainte nécessitant une version stable compatible plus ancienne. Ne force pas une version incompatible.

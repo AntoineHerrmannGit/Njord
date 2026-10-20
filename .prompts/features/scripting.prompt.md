@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis examine les packages, contrats de stratégie, flux d'exécution et protections déjà présents.
 
+Applique la philosophie vectorielle des pratiques communes : les APIs accessibles aux scripts représentent les ensembles d'instruments, observations et scénarios utiles comme des lots identifiables, dans les limites de l'API restreinte et du workflow appelant.
+
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : localise le changement dans la responsabilité de scripting, suis son usage par le backtest et l'éditeur, et demande confirmation avant de modifier les contrats d'extension, le cycle de vie partagé ou l'architecture d'exécution.
 
 Garde la cible .NET 10. Utilise les versions stables NuGet les plus récentes compatibles pour Roslyn et les dépendances impliquées ; si nécessaire, mets à jour les packages liés, puis retiens et documente la version compatible la plus récente si la version courante demeure inutilisable.

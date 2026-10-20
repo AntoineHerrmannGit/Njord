@@ -9,6 +9,8 @@ agent: "agent"
 
 Lis [le contexte métier](../BusinessContext.md) et [les pratiques d'implémentation](../EngineeringPractices.md), puis examine le chargement de configuration, les options typées et les fichiers JSON déjà présents.
 
+Respecte la philosophie vectorielle des pratiques communes dans les fonctionnalités configurées : les paramètres et comportements s'appliquent à des lots de requêtes, instruments ou scénarios sans obliger l'appelant à les répartir en opérations unitaires.
+
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : ne modifie que la configuration de la fonctionnalité demandée, suis tous ses consommateurs et demande confirmation avant de changer le mécanisme global de configuration ou d'introduire un couplage inter-fonctionnalités.
 
 Les projets restent sur .NET 10. Utilise les APIs intégrées ou la dernière version stable compatible des packages NuGet de configuration/validation ; mets à jour les dépendances concernées si nécessaire et documente tout recours à une version compatible plus ancienne.
