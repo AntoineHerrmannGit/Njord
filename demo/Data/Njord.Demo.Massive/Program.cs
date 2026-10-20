@@ -1,7 +1,11 @@
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Njord.Core.FileManagement;
+using Njord.Data.Referential.Configuration;
+using Njord.Data.Referential.Contracts;
+using Njord.Data.Referential.Errors;
 using Njord.DataProviders.Massive.Configuration;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Errors;
@@ -14,11 +18,9 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
-        var configurationPath = FindConfigurationPath();
-
-        if (!TryReadRequest(args, out var ticker, out var from, out var to))
+        if (!TryReadRequest(args, out var tickers, out var from, out var to))
         {
-            Console.Error.WriteLine("Usage : Njord.Demo.Massive [ticker] [date-debut yyyy-MM-dd] [date-fin yyyy-MM-dd]");
+            Console.Error.WriteLine("Usage : Njord.Demo.Massive [ticker1,ticker2,...] [date-debut yyyy-MM-dd] [date-fin yyyy-MM-dd]");
             return 2;
         }
 
@@ -31,26 +33,32 @@ internal static class Program
 
         try
         {
-            var configuration = new ConfigurationBuilder()
-                .AddJsonFile(configurationPath, optional: false, reloadOnChange: false)
+            var massiveConfiguration = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("massive.settings.json", optional: false, reloadOnChange: false)
+                .Build();
+            var referentialConfigurationPath = FindReferentialConfigurationPath();
+            var referentialConfiguration = new ConfigurationBuilder()
+                .AddJsonFile(referentialConfigurationPath, optional: false, reloadOnChange: false)
                 .Build();
             var services = new ServiceCollection();
-            services.AddMassiveDataProvider(configuration);
+            services.AddNjordReferential(referentialConfiguration);
+            services.AddMassiveDataProvider(massiveConfiguration);
 
             using var serviceProvider = services.BuildServiceProvider();
-            var provider = serviceProvider.GetRequiredService<IMassiveHistoricalMarketDataProvider>();
+            using var scope = serviceProvider.CreateScope();
+            var provider = scope.ServiceProvider.GetRequiredService<IMassiveHistoricalMarketDataProvider>();
             var request = new MassiveHistoricalOhlcRequest
             {
-                Ticker = ticker,
-                AssetClass = MassiveAssetClass.Stock,
+                Tickers = tickers,
                 From = from,
                 To = to,
                 Multiplier = 1,
-                Timespan = MassiveTimespan.Day,
-                Adjusted = true
+                Timespan = MassiveTimespan.Day
             };
 
-            Console.WriteLine($"Récupération Massive de {ticker}, du {from:yyyy-MM-dd} au {to:yyyy-MM-dd}...");
+            Console.WriteLine(
+                $"Récupération Massive de {string.Join(", ", tickers)}, du {from:yyyy-MM-dd} au {to:yyyy-MM-dd}...");
             var bars = await provider.GetHistoricalOhlcAsync(request, cancellationTokenSource.Token);
 
             if (bars.Count == 0)
@@ -68,7 +76,33 @@ internal static class Program
         }
         catch (OptionsValidationException exception)
         {
-            Console.Error.WriteLine($"Configuration Massive invalide : {exception.Message}");
+            Console.Error.WriteLine($"Configuration invalide : {exception.Message}");
+            return 1;
+        }
+        catch (FileNotFoundException exception)
+        {
+            Console.Error.WriteLine(
+                $"Fichier de configuration manquant : {exception.FileName ?? exception.Message}");
+            return 1;
+        }
+        catch (JsonException exception)
+        {
+            Console.Error.WriteLine($"Fichier de configuration JSON invalide : {exception.Message}");
+            return 1;
+        }
+        catch (InvalidDataException exception)
+        {
+            Console.Error.WriteLine($"Base JSON du référentiel invalide : {exception.Message}");
+            return 1;
+        }
+        catch (TickerReferenceResolutionException exception)
+        {
+            Console.Error.WriteLine($"Référentiel incomplet ou ambigu : {exception.Message}");
+            return 1;
+        }
+        catch (TickerReferenceConflictException exception)
+        {
+            Console.Error.WriteLine($"Référentiel invalide : {exception.Message}");
             return 1;
         }
         catch (MassiveDataProviderException exception)
@@ -90,20 +124,22 @@ internal static class Program
 
     #region Input and configuration
 
-    private static string FindConfigurationPath()
-        => FileManager.FindFile("massive.settings.json");
+    private static string FindReferentialConfigurationPath()
+        => FileManager.FindFile("referential.settings.local.json");
 
     private static bool TryReadRequest(
         IReadOnlyList<string> args,
-        out string ticker,
+        out IReadOnlyList<string> tickers,
         out DateOnly from,
         out DateOnly to)
     {
-        ticker = args.Count > 0 ? args[0] : "AAPL";
+        tickers = args.Count > 0
+            ? args[0].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            : ["AAPL"];
         to = DateOnly.FromDateTime(DateTime.UtcNow);
         from = to.AddDays(-10);
 
-        if (args.Count > 3)
+        if (args.Count > 3 || tickers.Count == 0)
             return false;
 
         if (args.Count > 1 &&

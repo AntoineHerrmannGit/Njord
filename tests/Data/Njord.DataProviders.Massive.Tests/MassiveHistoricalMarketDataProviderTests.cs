@@ -5,6 +5,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Njord.Core.Retry;
+using Njord.Data.Referential.Contracts;
+using Njord.Data.Referential.Errors;
+using Njord.Data.Referential.Models;
 using Njord.DataProviders.Massive.Configuration;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Errors;
@@ -20,32 +23,35 @@ public sealed class MassiveHistoricalMarketDataProviderTests
     #region Asset class endpoints
 
     [Theory]
-    [InlineData(MassiveAssetClass.Stock, "AAPL", "/v2/aggs/ticker/AAPL/range/1/day/2025-01-01/2025-01-31")]
-    [InlineData(MassiveAssetClass.Index, "I:SPX", "/v2/aggs/ticker/I:SPX/range/1/day/2025-01-01/2025-01-31")]
-    [InlineData(MassiveAssetClass.Option, "O:AAPL250117C00100000", "/v2/aggs/ticker/O:AAPL250117C00100000/range/1/day/2025-01-01/2025-01-31")]
-    [InlineData(MassiveAssetClass.Crypto, "X:BTCUSD", "/v2/aggs/ticker/X:BTCUSD/range/1/day/2025-01-01/2025-01-31")]
-    [InlineData(MassiveAssetClass.Forex, "C:EURUSD", "/v2/aggs/ticker/C:EURUSD/range/1/day/2025-01-01/2025-01-31")]
-    [InlineData(MassiveAssetClass.Future, "ESU5", "/futures/v1/aggs/ESU5")]
+    [InlineData("Stock", "AAPL", "AAPL", "/v2/aggs/ticker/AAPL/range/1/day/2025-01-01/2025-01-31")]
+    [InlineData("Index", "SPX", "I:SPX", "/v2/aggs/ticker/I:SPX/range/1/day/2025-01-01/2025-01-31")]
+    [InlineData("Option", "AAPL-2025-01-17-C-100", "O:AAPL250117C00100000", "/v2/aggs/ticker/O:AAPL250117C00100000/range/1/day/2025-01-01/2025-01-31")]
+    [InlineData("Crypto", "BTC/USD", "X:BTCUSD", "/v2/aggs/ticker/X:BTCUSD/range/1/day/2025-01-01/2025-01-31")]
+    [InlineData("Forex", "EUR/USD", "C:EURUSD", "/v2/aggs/ticker/C:EURUSD/range/1/day/2025-01-01/2025-01-31")]
+    [InlineData("Future", "ES=2025-01-17", "ESU5", "/futures/v1/aggs/ESU5")]
     public async Task GetHistoricalOhlcAsync_UsesAssetSpecificEndpointAndMapsMarketData(
-        MassiveAssetClass assetClass,
-        string ticker,
+        string assetClassName,
+        string njordTicker,
+        string providerTicker,
         string expectedPath)
     {
+        var assetClass = Enum.Parse<MassiveAssetClass>(assetClassName);
         var response = assetClass == MassiveAssetClass.Future ? FuturesResponse : StandardResponse;
         var handler = new QueueHttpMessageHandler(JsonResponse(response));
         var provider = CreateProvider(handler);
-        var request = CreateRequest(assetClass, ticker);
+        var request = CreateRequest(assetClass, njordTicker);
 
         var results = await provider.GetHistoricalOhlcAsync(request);
 
         var sentRequest = Assert.Single(handler.Requests);
         var requestUri = sentRequest.Uri!;
         Assert.Equal(expectedPath, Uri.UnescapeDataString(requestUri.AbsolutePath));
+        Assert.Contains(providerTicker, Uri.UnescapeDataString(requestUri.AbsolutePath), StringComparison.Ordinal);
         Assert.Equal("Bearer", sentRequest.Authorization?.Scheme);
         Assert.Equal("test-api-key", sentRequest.Authorization?.Parameter);
         Assert.DoesNotContain("apiKey", requestUri.Query, StringComparison.OrdinalIgnoreCase);
         Assert.Single(results);
-        Assert.Equal(ticker, results[0].Ticker);
+        Assert.Equal(njordTicker, results[0].Ticker);
         Assert.Equal(10.25m, results[0].Open);
         Assert.Equal(12m, results[0].High);
         Assert.Equal(9.5m, results[0].Low);
@@ -107,6 +113,110 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         Assert.Contains("cursor=next", handler.Requests[1].Uri!.Query, StringComparison.Ordinal);
         Assert.DoesNotContain("apiKey", handler.Requests[1].Uri!.Query, StringComparison.OrdinalIgnoreCase);
         Assert.All(handler.Requests, request => Assert.Equal("api.massive.test", request.Uri!.Host));
+    }
+
+    [Fact]
+    public async Task GetHistoricalOhlcAsync_QueriesMultipleCanonicalTickersWithoutCallerAssetClass()
+    {
+        var handler = new QueueHttpMessageHandler(
+            JsonResponse(StandardResponse),
+            JsonResponse(StandardResponse),
+            JsonResponse(StandardResponse));
+        var provider = CreateProvider(handler);
+        var request = new MassiveHistoricalOhlcRequest
+        {
+            Tickers = ["AAPL", "SPX", "EUR/USD"],
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 31),
+            Multiplier = 1,
+            Timespan = MassiveTimespan.Day
+        };
+
+        var bars = await provider.GetHistoricalOhlcAsync(request);
+
+        Assert.Equal(["AAPL", "SPX", "EUR/USD"], bars.Select(bar => bar.Ticker));
+        Assert.Equal(
+            [
+                "/v2/aggs/ticker/AAPL/range/1/day/2025-01-01/2025-01-31",
+                "/v2/aggs/ticker/I:SPX/range/1/day/2025-01-01/2025-01-31",
+                "/v2/aggs/ticker/C:EURUSD/range/1/day/2025-01-01/2025-01-31"
+            ],
+            handler.Requests.Select(item => Uri.UnescapeDataString(item.Uri!.AbsolutePath)));
+    }
+
+    [Fact]
+    public async Task GetHistoricalOhlcAsync_RejectsUnknownCanonicalTickerBeforeCallingMassive()
+    {
+        var handler = new QueueHttpMessageHandler();
+        var provider = CreateProvider(handler);
+        var request = CreateRequest(MassiveAssetClass.Stock, "UNKNOWN");
+
+        await Assert.ThrowsAsync<TickerReferenceResolutionException>(
+            () => provider.GetHistoricalOhlcAsync(request));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GetHistoricalOhlcAsync_RejectsNjordAssetClassNotSupportedByMassive()
+    {
+        var handler = new QueueHttpMessageHandler();
+        var provider = CreateProvider(
+            handler,
+            mappings:
+            [
+                CreateMapping(
+                    "BOND",
+                    "US0000000000",
+                    NjordAssetClass.Bond)
+            ]);
+
+        await Assert.ThrowsAsync<MassiveDataProviderException>(() =>
+            provider.GetHistoricalOhlcAsync(CreateRequest(MassiveAssetClass.Stock, "BOND")));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GetHistoricalOhlcAsync_RejectsDuplicateTickersBeforeResolving()
+    {
+        var handler = new QueueHttpMessageHandler();
+        var provider = CreateProvider(handler);
+        var request = new MassiveHistoricalOhlcRequest
+        {
+            Tickers = ["AAPL", "aapl"],
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 31),
+            Multiplier = 1,
+            Timespan = MassiveTimespan.Day
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.GetHistoricalOhlcAsync(request));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GetHistoricalOhlcAsync_SplitsQueryAcrossMappingValidityPeriods()
+    {
+        var handler = new QueueHttpMessageHandler(
+            JsonResponse(StandardResponse),
+            JsonResponse(StandardResponse));
+        var mappings = new[]
+        {
+            CreateMapping("AAPL", "AAPL1", NjordAssetClass.Stock, new DateTime(2025, 1, 1), new DateTime(2025, 1, 15)),
+            CreateMapping("AAPL", "AAPL2", NjordAssetClass.Stock, new DateTime(2025, 1, 16), new DateTime(2025, 1, 31))
+        };
+        var provider = CreateProvider(handler, mappings: mappings);
+        var request = CreateRequest(MassiveAssetClass.Stock, "AAPL");
+
+        var bars = await provider.GetHistoricalOhlcAsync(request);
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(2, bars.Count);
+        Assert.All(bars, bar => Assert.Equal("AAPL", bar.Ticker));
+        Assert.Contains("/ticker/AAPL1/range/1/day/2025-01-01/2025-01-15", handler.Requests[0].Uri!.AbsolutePath);
+        Assert.Contains("/ticker/AAPL2/range/1/day/2025-01-16/2025-01-31", handler.Requests[1].Uri!.AbsolutePath);
     }
 
     [Fact]
@@ -192,21 +302,34 @@ public sealed class MassiveHistoricalMarketDataProviderTests
     {
         var handler = new QueueHttpMessageHandler();
         var provider = CreateProvider(handler);
-        var request = CreateRequest(MassiveAssetClass.Future, "ESU5") with { Adjusted = true };
+        var request = CreateRequest(MassiveAssetClass.Future, "ES=2025-01-17") with { Adjusted = true };
 
         await Assert.ThrowsAsync<ArgumentException>(() => provider.GetHistoricalOhlcAsync(request));
         Assert.Empty(handler.Requests);
     }
 
     [Fact]
-    public async Task GetHistoricalOhlcAsync_RequiresSessionIntervalForDailyFutures()
+    public async Task GetHistoricalOhlcAsync_UsesSessionBarsForFutureInDailyVectorRequest()
     {
-        var handler = new QueueHttpMessageHandler();
+        var handler = new QueueHttpMessageHandler(
+            JsonResponse(StandardResponse),
+            JsonResponse(FuturesResponse));
         var provider = CreateProvider(handler);
-        var request = CreateRequest(MassiveAssetClass.Future, "ESU5") with { Timespan = MassiveTimespan.Day };
+        var request = new MassiveHistoricalOhlcRequest
+        {
+            Tickers = ["AAPL", "ES=2025-01-17"],
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 31),
+            Multiplier = 1,
+            Timespan = MassiveTimespan.Day
+        };
 
-        await Assert.ThrowsAsync<ArgumentException>(() => provider.GetHistoricalOhlcAsync(request));
-        Assert.Empty(handler.Requests);
+        var bars = await provider.GetHistoricalOhlcAsync(request);
+
+        Assert.Equal(["AAPL", "ES=2025-01-17"], bars.Select(bar => bar.Ticker));
+        Assert.Contains("/range/1/day/", handler.Requests[0].Uri!.AbsolutePath);
+        Assert.Contains("resolution=1session", handler.Requests[1].Uri!.Query, StringComparison.Ordinal);
+        Assert.Null(bars[1].Interval);
     }
 
     [Fact]
@@ -365,7 +488,8 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         QueueHttpMessageHandler handler,
         Action<MassiveDataProviderOptions>? configure = null,
         int retryAttempts = 1,
-        TimeSpan? retryBaseDelay = null)
+        TimeSpan? retryBaseDelay = null,
+        IReadOnlyList<TickerProviderMapping>? mappings = null)
     {
         var options = new MassiveDataProviderOptions
         {
@@ -392,14 +516,42 @@ public sealed class MassiveHistoricalMarketDataProviderTests
             new RetryPolicy(Options.Create(retryOptions), timeProvider),
             new MassiveCircuitBreaker(providerOptions, timeProvider),
             timeProvider);
-        return new MassiveHistoricalMarketDataProvider(apiClient, new MassiveOhlcMapper());
+        return new MassiveHistoricalMarketDataProvider(
+            apiClient,
+            new MassiveOhlcMapper(),
+            new StubInstrumentReferential(mappings ?? CreateDefaultMappings()));
     }
+
+    private static IReadOnlyList<TickerProviderMapping> CreateDefaultMappings() =>
+    [
+        CreateMapping("AAPL", "AAPL", NjordAssetClass.Stock),
+        CreateMapping("SPX", "I:SPX", NjordAssetClass.Index),
+        CreateMapping("AAPL-2025-01-17-C-100", "O:AAPL250117C00100000", NjordAssetClass.Option),
+        CreateMapping("BTC/USD", "X:BTCUSD", NjordAssetClass.Crypto),
+        CreateMapping("EUR/USD", "C:EURUSD", NjordAssetClass.Forex),
+        CreateMapping("ES=2025-01-17", "ESU5", NjordAssetClass.Future)
+    ];
+
+    private static TickerProviderMapping CreateMapping(
+        string ticker,
+        string providerTicker,
+        NjordAssetClass assetClass,
+        DateTime? startDate = null,
+        DateTime? endDate = null) =>
+        new()
+        {
+            Ticker = ticker,
+            Provider = "Massive",
+            ProviderTicker = providerTicker,
+            AssetClass = assetClass,
+            StartDate = startDate ?? DateTime.MinValue,
+            EndDate = endDate ?? DateTime.MaxValue
+        };
 
     private static MassiveHistoricalOhlcRequest CreateRequest(MassiveAssetClass assetClass, string ticker) =>
         new()
         {
-            Ticker = ticker,
-            AssetClass = assetClass,
+            Tickers = [ticker],
             From = new DateOnly(2025, 1, 1),
             To = new DateOnly(2025, 1, 31),
             Multiplier = 1,
@@ -453,6 +605,63 @@ public sealed class MassiveHistoricalMarketDataProviderTests
     }
 
     private sealed record RequestSnapshot(Uri? Uri, AuthenticationHeaderValue? Authorization);
+
+    private sealed class StubInstrumentReferential : IInstrumentReferential
+    {
+        private readonly IReadOnlyList<TickerProviderMapping> _mappings;
+
+        public StubInstrumentReferential(IReadOnlyList<TickerProviderMapping> mappings)
+        {
+            _mappings = mappings;
+        }
+
+        public Task AddMappingsAsync(
+            IReadOnlyCollection<TickerProviderMapping> mappings,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TickerProviderMapping>> GetMappingsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(_mappings);
+
+        public Task<IReadOnlyList<TickerProviderMapping>> ResolveAsync(
+            string ticker,
+            string provider,
+            DateOnly from,
+            DateOnly to,
+            CancellationToken cancellationToken = default)
+        {
+            var mappings = _mappings
+                .Where(item =>
+                string.Equals(item.Ticker, ticker, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(item.Provider, provider, StringComparison.OrdinalIgnoreCase) &&
+                item.StartDate <= to.ToDateTime(TimeOnly.MaxValue) &&
+                item.EndDate >= from.ToDateTime(TimeOnly.MinValue))
+                .OrderBy(item => item.StartDate)
+                .ToArray();
+            if (mappings.Length == 0)
+                throw new TickerReferenceResolutionException(
+                    $"No mapping exists for '{ticker}' and provider '{provider}'.");
+
+            var cursor = from;
+            foreach (var mapping in mappings)
+            {
+                var start = DateOnly.FromDateTime(mapping.StartDate);
+                var end = DateOnly.FromDateTime(mapping.EndDate);
+                if (start > cursor)
+                    throw new TickerReferenceResolutionException(
+                        $"No mapping covers '{ticker}' for provider '{provider}'.");
+
+                if (end >= to)
+                    return Task.FromResult<IReadOnlyList<TickerProviderMapping>>(mappings);
+
+                cursor = end.AddDays(1);
+            }
+
+            throw new TickerReferenceResolutionException(
+                $"No mapping covers '{ticker}' for provider '{provider}'.");
+        }
+    }
 
     #endregion
 }

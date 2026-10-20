@@ -11,7 +11,7 @@ internal sealed class MassiveOhlcMapper : IMassiveOhlcMapper
 
     public IReadOnlyList<Ohlc> Map(
         IReadOnlyList<MassiveAggregateResponseDto> pages,
-        MassiveHistoricalOhlcRequest request)
+        MassiveResolvedOhlcRequest request)
     {
         var bars = new List<Ohlc>();
         foreach (var page in pages)
@@ -37,7 +37,7 @@ internal sealed class MassiveOhlcMapper : IMassiveOhlcMapper
     private static Ohlc MapBar(
         MassiveAggregateDto aggregate,
         bool? isAdjusted,
-        MassiveHistoricalOhlcRequest request,
+        MassiveResolvedOhlcRequest request,
         string? requestId)
     {
         var open = aggregate.Open ?? aggregate.FuturesOpen;
@@ -62,7 +62,7 @@ internal sealed class MassiveOhlcMapper : IMassiveOhlcMapper
         var timestamp = GetTimestamp(aggregate, request.AssetClass, requestId);
         return new Ohlc
         {
-            Ticker = request.Ticker,
+            Ticker = request.NjordTicker,
             Open = open.Value,
             High = high.Value,
             Low = low.Value,
@@ -107,7 +107,7 @@ internal sealed class MassiveOhlcMapper : IMassiveOhlcMapper
         }
     }
 
-    private static TimeSpan? GetInterval(MassiveHistoricalOhlcRequest request)
+    private static TimeSpan? GetInterval(MassiveResolvedOhlcRequest request)
     {
         var unit = request.Timespan switch
         {

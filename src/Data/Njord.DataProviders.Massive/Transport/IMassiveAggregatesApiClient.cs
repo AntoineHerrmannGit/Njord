@@ -8,7 +8,7 @@ internal interface IMassiveAggregatesApiClient
     #region Aggregate retrieval
 
     Task<IReadOnlyList<MassiveAggregateResponseDto>> GetHistoricalAggregatesAsync(
-        MassiveHistoricalOhlcRequest request,
+        MassiveResolvedOhlcRequest request,
         CancellationToken cancellationToken);
 
     #endregion

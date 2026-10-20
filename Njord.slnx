@@ -7,6 +7,7 @@
     <Project Path="src/Core/Njord.Core.Serialization/Njord.Core.Serialization.csproj" />
   </Folder>
   <Folder Name="/src/Data/">
+    <Project Path="src/Data/Njord.Data.Referential/Njord.Data.Referential.csproj" />
     <Project Path="src/Data/Njord.DataProviders.Massive/Njord.DataProviders.Massive.csproj" />
   </Folder>
   <Folder Name="/src/Models/">
@@ -31,6 +32,7 @@
     <Project Path="tests/Core/Njord.Core.Serialization.Tests/Njord.Core.Serialization.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Data/">
+    <Project Path="tests/Data/Njord.Data.Referential.Tests/Njord.Data.Referential.Tests.csproj" />
     <Project Path="tests/Data/Njord.DataProviders.Massive.Tests/Njord.DataProviders.Massive.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Models/">

@@ -45,7 +45,7 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
     #region Historical aggregates
 
     public async Task<IReadOnlyList<MassiveAggregateResponseDto>> GetHistoricalAggregatesAsync(
-        MassiveHistoricalOhlcRequest request,
+        MassiveResolvedOhlcRequest request,
         CancellationToken cancellationToken)
     {
         request.Validate();
@@ -213,7 +213,7 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
 
     #region Request URI construction
 
-    private Uri BuildInitialUri(MassiveHistoricalOhlcRequest request)
+    private Uri BuildInitialUri(MassiveResolvedOhlcRequest request)
     {
         var ticker = Uri.EscapeDataString(request.Ticker);
         var from = request.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

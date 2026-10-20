@@ -10,7 +10,7 @@ internal interface IMassiveOhlcMapper
 
     IReadOnlyList<Ohlc> Map(
         IReadOnlyList<MassiveAggregateResponseDto> pages,
-        MassiveHistoricalOhlcRequest request);
+        MassiveResolvedOhlcRequest request);
 
     #endregion
 }
