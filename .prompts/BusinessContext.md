@@ -95,8 +95,9 @@ Les vues de logs et de graphes doivent refléter les données réellement collec
 - La configuration d'une fonctionnalité doit être isolée : sa modification ne doit pas changer implicitement le comportement d'une autre fonctionnalité.
 - Si un paramètre ou un composant est partagé et crée un couplage fonctionnel, ce couplage doit être explicitement documenté dans le code, la documentation et les fichiers de configuration concernés.
 - Ne pas utiliser de variables d'environnement pour la configuration de l'application, y compris les credentials : les placer dans le fichier JSON local spécialisé de leur fonctionnalité.
-- Les fichiers contenant des secrets sont locaux, exclus de Git, accessibles uniquement au compte de l'application et ne doivent jamais être publiés dans le dépôt. En CI/CD, fournir le fichier JSON comme artefact secret protégé et le rendre disponible au runtime sans passer par des variables d'environnement.
-- Les fichiers JSON d'exemple suivis par Git ne contiennent aucun secret ; ils utilisent une valeur vide ou un placeholder non fonctionnel.
+- Les clés API publiques de services gratuits peuvent, selon la décision actuelle du projet, être conservées en clair dans les fichiers de settings suivis par Git. Toute clé donnant accès à un service payant ou confidentiel doit être déplacée dans un JSON local exclu de Git, accessible uniquement au compte de l'application ; en CI/CD, fournir ce fichier comme artefact secret protégé sans passer par des variables d'environnement.
+- Pour les démos, utiliser sans override les fichiers de settings appartenant aux projets source lorsqu'ils existent. Un fichier local séparé peut configurer une dépendance distincte qui n'a pas de settings source dédiés ; les overrides des settings source sont réservés aux mocks de test.
+- Les fichiers JSON d'exemple suivis par Git ne doivent contenir aucune donnée confidentielle ; les clés publiques de services gratuits peuvent y figurer si le projet l'autorise.
 
 ### Opérations transversales
 

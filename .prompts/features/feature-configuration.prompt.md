@@ -33,7 +33,8 @@ Permettre à l'utilisateur ou à l'opérateur de paramétrer les fonctionnalité
 - Ne pas ajouter un paramètre pour chaque constante. N'exposer que les décisions qui doivent réellement être configurables et documenter leurs valeurs par défaut.
 - Ne pas copier un paramètre commun dans plusieurs fichiers sans définir son autorité. Si deux fonctionnalités partagent réellement un réglage ou qu'un composant dépend des options d'un autre, rendre le lien explicite et documenter le couplage dans le code, dans la documentation et dans chacun des fichiers JSON concernés.
 - Privilégier un réglage local au domaine fonctionnel. Si un réglage global est indispensable (par exemple niveau et rétention d'observabilité), le placer dans un domaine transversal identifié et documenter les fonctionnalités impactées plutôt que le rendre implicitement global.
-- Ne jamais stocker de clés API, mots de passe, tokens ou autres secrets dans un fichier JSON suivi par Git. Ne pas utiliser de variables d'environnement ni de User Secrets pour les paramètres de l'application : charger les valeurs depuis les fichiers JSON locaux spécialisés. Un secret peut être en clair dans un JSON local non suivi si l'accès au fichier est restreint au compte de l'application ; en CI/CD, fournir ce fichier par un mécanisme protégé de fichiers/artefacts secrets. Les exemples suivis par Git doivent utiliser une valeur vide ou un placeholder non fonctionnel.
+- Ne pas utiliser de variables d'environnement ni de User Secrets pour les paramètres de l'application : charger les valeurs depuis les fichiers JSON spécialisés. Selon la décision actuelle du projet, les clés API publiques de services gratuits peuvent figurer en clair dans les settings suivis par Git ; les secrets confidentiels (mots de passe, tokens privés, clés payantes/confidentielles) doivent rester dans un JSON local non suivi, accessible au seul compte de l'application, ou être fournis comme fichier secret protégé en CI/CD. Ne place jamais de credential dans le code ou les logs.
+- Dans les démos, réutiliser directement les settings possédés par les projets source lorsqu'ils existent ; ne pas les remplacer ou les fusionner avec une configuration locale. Les fichiers locaux séparés peuvent configurer des dépendances distinctes sans settings source propres. Les overrides sont réservés aux mocks de test.
 - Si le rechargement à chaud est demandé, définir les composants affectés, les garanties atomiques et les conséquences sur les opérations déjà démarrées. Ne pas introduire de rechargement dynamique implicite.
 - Documenter pour chaque fichier sa finalité, son propriétaire, les valeurs par défaut, la validation, les secrets externes requis et les dépendances/couplages entre fonctionnalités.
 
@@ -45,7 +46,7 @@ Commence par un test du cas d'usage métier configurable : une valeur autorisée
 - test transversal d'isolation démontrant qu'une modification d'un fichier n'altère pas les options ou comportements d'autres fonctionnalités ;
 - tests des valeurs par défaut et des relations/couplages explicitement définis.
 
-- Vérifier que les exemples de configuration sont valides et ne contiennent aucun secret.
+- Vérifier que les exemples de configuration sont valides et ne contiennent aucune donnée confidentielle ; les clés API publiques des services gratuits sont admises dans les settings suivis selon la politique actuelle du projet.
 - Exécuter tests ciblés et build, puis rapporter fichiers créés, paramètres et limites.
 
 ## Livrable

@@ -13,6 +13,8 @@ Applique la philosophie vectorielle des pratiques communes à l'expérience util
 
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : garde le changement au plus près de l'écran/flux demandé, suis ses interactions avec services métier, navigation et données, et demande confirmation avant de modifier le framework WPF, l'architecture UI partagée ou un comportement global de navigation.
 
+Pour toute démo, utilise toujours directement les fichiers de settings définis dans les projets source lorsqu'ils existent, sans les remplacer ni les fusionner avec des overrides locaux. Un fichier local séparé peut uniquement configurer une dépendance distincte qui ne possède pas ses propres settings source ; les overrides des settings source sont réservés aux mocks de test.
+
 Le projet WPF doit cibler .NET 10 avec un TFM Windows adapté, généralement `net10.0-windows`. Pour WPF, AvalonEdit et les bibliothèques de graphiques, privilégie les dernières versions stables compatibles avec ce TFM ; mets à jour les dépendances directement concernées pour résoudre les incompatibilités, sinon utilise la plus récente version compatible et documente la limite. N'introduis pas de préversions sans demande explicite.
 
 Dans l'ordre indicatif, implémente les vues métier au-dessus des workflows et contrats qu'elles consomment ; un squelette WPF peut être livré plus tôt s'il ne fige pas les contrats métier. Regroupe l'application, les vues et ressources dans des projets UI à responsabilité claire sous `UI`, et évite de placer des règles métier dans ces projets.

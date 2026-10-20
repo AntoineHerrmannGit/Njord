@@ -13,6 +13,8 @@ Respecte la philosophie vectorielle des pratiques communes : instrumenter les op
 
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : limite le changement au contrôle ou à l'opération demandée, suis ses interactions avec les fonctions qui l'utilisent et demande confirmation avant de changer une politique transversale de sécurité, d'audit ou de collecte.
 
+Pour toute démo, utilise toujours directement les fichiers de settings définis dans les projets source lorsqu'ils existent, sans les remplacer ni les fusionner avec des overrides locaux. Un fichier local séparé peut uniquement configurer une dépendance distincte qui ne possède pas ses propres settings source ; les overrides des settings source sont réservés aux mocks de test.
+
 Maintiens les projets en .NET 10. Pour les packages NuGet de sécurité, logging, OpenTelemetry et export Prometheus touchés, utilise la dernière version stable compatible ; mets à jour les dépendances associées si cela résout le problème, et documente toute contrainte nécessitant une version stable compatible plus ancienne. Ne force pas une version incompatible.
 
 La sécurité et l'observabilité sont transversales : définir tôt les mécanismes minimaux et les intégrer à chaque workflow au fil des développements, puis construire les vues d'observabilité après disponibilité des événements structurés. Garder les bibliothèques/adaptateurs techniques partagés séparés des audits et règles métier ; placer les projets sous un thème explicite tel que `Core`, `Infrastructure` ou `Observability` selon l'organisation existante.
@@ -25,7 +27,7 @@ Fournir authentification locale, chiffrement des secrets et audit trail, avec lo
 
 - Avant de coder, précise quel actif est protégé, contre quel acteur et dans quel flux ; respecte les mécanismes OS/plateforme et packages de confiance déjà présents.
 - N'invente pas de primitives cryptographiques. Utilise les APIs reconnues et le modèle de gestion de clés déjà retenu ; distingue chiffrement, stockage de clés et protection de la configuration.
-- Ne configure pas l'application via des variables d'environnement, y compris pour les secrets. Utilise les fichiers JSON locaux dédiés ; les fichiers contenant des secrets ne doivent pas être suivis par Git, doivent avoir des permissions d'accès limitées et, en CI/CD, doivent être fournis comme fichiers secrets protégés.
+- Ne configure pas l'application via des variables d'environnement. Utilise les fichiers JSON spécialisés ; les secrets confidentiels ne doivent pas être suivis par Git, doivent avoir des permissions d'accès limitées et, en CI/CD, doivent être fournis comme fichiers secrets protégés. Selon la décision actuelle du projet, les clés API publiques de services gratuits peuvent rester en clair dans les settings suivis par Git ; ne les place jamais dans le code ou les logs.
 - Ne journalise jamais secrets, tokens, chaînes de connexion complètes ou données sensibles. Masque/minimise les informations sensibles sans dégrader l'audit nécessaire.
 - Définis les événements d'audit avec identité disponible, action, cible, horodatage et résultat appropriés. Évite qu'un échec d'audit soit silencieusement présenté comme une opération sûre lorsque la politique exige un audit complet.
 - Sépare l'audit métier (actions et transitions pertinentes imputables à un acteur/run) des traces techniques (étapes, durées, dépendances et erreurs). La complétude requise pour l'audit obligatoire doit être distincte de la collecte diagnostique facultative.

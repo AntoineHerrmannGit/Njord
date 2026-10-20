@@ -8,6 +8,8 @@ L'utilisation de `Semaphore` et `SemaphoreSlim` est interdite dans toute l'appli
 
 Le produit adopte une philosophie de traitement vectoriel : les flux portant sur plusieurs instruments, données, requêtes de pricing ou scénarios de backtest doivent être décrits et consommés comme des lots, tandis que les détails de dispatch restent internes. La règle complète et ses limites sont définies dans [EngineeringPractices.md](./EngineeringPractices.md).
 
+Les démos doivent utiliser directement les fichiers de settings appartenant aux projets source lorsqu'ils existent, sans les remplacer par des configurations locales ; les fichiers locaux séparés restent réservés aux dépendances qui n'ont pas de settings source dédiés.
+
 ## Documents de référence
 
 - [BusinessContext.md](./BusinessContext.md) est la source de vérité pour les objectifs métier, les fonctionnalités attendues et les contraintes formulées dans le cahier des charges.

@@ -13,6 +13,8 @@ Vérifie la philosophie vectorielle des pratiques communes : les tests métier c
 
 Applique le cadrage de portée et d'impact des pratiques communes : n'élargis pas le périmètre de tests ou de documentation à d'autres fonctionnalités sans nécessité, mais vérifie et mets à jour toute documentation/test directement affecté par un changement accepté.
 
+Pour toute démo, utilise toujours directement les fichiers de settings définis dans les projets source lorsqu'ils existent, sans les remplacer ni les fusionner avec des overrides locaux. Un fichier local séparé peut uniquement configurer une dépendance distincte qui ne possède pas ses propres settings source ; les overrides des settings source sont réservés aux mocks de test.
+
 Les projets et outils de test doivent rester compatibles avec .NET 10. Pour les packages NuGet de test, documentation ou build touchés, privilégie la dernière version stable compatible ; mets à jour les dépendances concernées pour résoudre une incompatibilité et documente le choix de la version stable la plus récente compatible si la dernière version ne peut pas être retenue.
 
 Applique la stratégie de validation à chaque étape de la feuille de route plutôt qu'à la fin seulement. Organise les projets de tests par responsabilité et par flux métier sous un répertoire `tests` thématique ; vérifie que les projets de production restent identifiables et ne regroupent pas des responsabilités indépendantes.

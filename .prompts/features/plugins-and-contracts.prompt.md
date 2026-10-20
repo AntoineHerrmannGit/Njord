@@ -13,6 +13,8 @@ Applique la philosophie vectorielle des pratiques communes aux contrats de plugi
 
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : concentre le changement sur le point d'extension demandé, identifie tous ses consommateurs et demande confirmation avant de changer un contrat partagé, la stratégie de versionnement ou l'architecture de découverte avec un impact sur les plugins existants.
 
+Pour toute démo, utilise toujours directement les fichiers de settings définis dans les projets source lorsqu'ils existent, sans les remplacer ni les fusionner avec des overrides locaux. Un fichier local séparé peut uniquement configurer une dépendance distincte qui ne possède pas ses propres settings source ; les overrides des settings source sont réservés aux mocks de test.
+
 Les projets hôtes et contrats restent ciblés sur .NET 10 et les packages NuGet MEF/extension doivent être aux versions stables les plus récentes compatibles. Mets à jour les dépendances directement concernées si besoin ; si la dernière version reste incompatible avec les contraintes de plugins, utilise la plus récente version compatible et documente les conséquences.
 
 Introduis les contrats plugins au moment où les points d'extension concrets sont identifiés, avant d'implémenter les plugins qui en dépendent ; ne bloque pas les fonctionnalités internes sur un système MEF spéculatif. Organise contrats et découverte sous `Extensions` ou `Core` selon leur responsabilité, sans les confondre avec les workflows métier.

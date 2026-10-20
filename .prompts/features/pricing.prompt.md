@@ -13,6 +13,8 @@ Applique la philosophie de traitement vectoriel des pratiques communes : les con
 
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : conserve la modification dans le modèle/responsabilité demandés, examine ses consommateurs et demande confirmation avant de changer les contrats ou l'architecture de pricing, ou d'affecter le comportement d'autres fonctionnalités.
 
+Pour toute démo, utilise toujours directement les fichiers de settings définis dans les projets source lorsqu'ils existent, sans les remplacer ni les fusionner avec des overrides locaux. Un fichier local séparé peut uniquement configurer une dépendance distincte qui ne possède pas ses propres settings source ; les overrides des settings source sont réservés aux mocks de test.
+
 La cible reste .NET 10. Utilise la dernière version stable compatible des packages NuGet nécessaires aux calculs ou tests concernés ; mets à jour les dépendances pertinentes pour lever une incompatibilité et documente toute contrainte qui impose une version compatible plus ancienne.
 
 Place le moteur après la disponibilité des contrats et des données de marché dont le calcul dépend. Organise les projets dans `Pricing` ou le répertoire thématique existant, en séparant clairement contrat métier, calcul et adaptateurs si ces responsabilités existent indépendamment. Les helpers mathématiques purement techniques ne sont mutualisés que s'ils servent réellement plusieurs consommateurs.

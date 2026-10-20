@@ -13,6 +13,8 @@ Applique la philosophie vectorielle des pratiques communes : les APIs accessible
 
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : localise le changement dans la responsabilité de scripting, suis son usage par le backtest et l'éditeur, et demande confirmation avant de modifier les contrats d'extension, le cycle de vie partagé ou l'architecture d'exécution.
 
+Pour toute démo, utilise toujours directement les fichiers de settings définis dans les projets source lorsqu'ils existent, sans les remplacer ni les fusionner avec des overrides locaux. Un fichier local séparé peut uniquement configurer une dépendance distincte qui ne possède pas ses propres settings source ; les overrides des settings source sont réservés aux mocks de test.
+
 Garde la cible .NET 10. Utilise les versions stables NuGet les plus récentes compatibles pour Roslyn et les dépendances impliquées ; si nécessaire, mets à jour les packages liés, puis retiens et documente la version compatible la plus récente si la version courante demeure inutilisable.
 
 Construis la compilation sur les contrats de stratégie/API qui lui sont nécessaires, puis intègre-la au workflow de backtest et à l'éditeur UI sans coupler ces composants entre eux. Place les projets sous `Scripting` (ou l'équivalent existant) et sépare l'éditeur WPF, le compilateur et les contrats lorsque leurs responsabilités le justifient.

@@ -78,6 +78,7 @@ Respecter l'organisation et l'ordre de développement indicatifs décrits dans [
 - Éviter les commentaires qui répètent le code ; documenter uniquement les décisions ou contraintes non évidentes.
 - Garder les paramètres de configuration au plus près de la fonctionnalité propriétaire ; ne pas faire dépendre une fonctionnalité des options privées d'une autre.
 - Lorsqu'un paramètre doit réellement être partagé, déclarer et documenter explicitement le couplage dans le code, la documentation et chaque fichier de configuration concerné.
+- Les démos utilisent directement les fichiers de settings appartenant aux projets source lorsqu'ils existent ; les relier ou les copier vers leur sortie si nécessaire, sans les fusionner avec des overrides locaux. Un fichier local séparé reste possible pour une dépendance distincte qui ne possède pas de settings source (par exemple la connexion SQL du référentiel). Ne surcharger les settings source que dans un mock de test, pas dans une démo réelle.
 
 ## 5. Fiabilité et erreurs
 
@@ -100,7 +101,7 @@ Respecter l'organisation et l'ordre de développement indicatifs décrits dans [
 
 ## 7. Sécurité
 
-- Ne jamais écrire ou committer de secrets, tokens, clés API ou données personnelles.
+- Ne jamais écrire ou committer de secrets confidentiels, tokens privés ou données personnelles. Selon la décision actuelle du projet, les clés API publiques de services gratuits peuvent être conservées en clair dans les fichiers de settings suivis par Git ; si une clé devient payante ou confidentielle, la déplacer vers un JSON local protégé avant usage.
 - Utiliser les mécanismes de configuration et de chiffrement déjà présents ; ne pas inventer une cryptographie maison.
 - Traiter comme non fiable tout fichier importé, contenu réseau, plugin et script.
 - `AssemblyLoadContext` isole le chargement d'assemblies, mais ne fournit pas une sandbox de sécurité pour du code arbitraire.
@@ -116,7 +117,7 @@ Respecter l'organisation et l'ordre de développement indicatifs décrits dans [
 - Toute valeur déterminée par l'environnement, le déploiement ou un choix de fournisseur, ainsi que tout réglage qui doit rester fixe pendant la durée d'exécution après le démarrage, doit provenir du fichier JSON local spécialisé de sa fonctionnalité, être liée à des options typées et être fournie via l'injection de dépendances. Ne hardcode pas ces réglages dans des `const` ou des champs privés.
 - Distinguer ces réglages des invariants de protocole, des constantes mathématiques et des valeurs intrinsèques à une règle métier, qui restent dans le code. Ne rends pas chaque constante configurable sans besoin fonctionnel. N'active pas le rechargement à chaud implicitement ; choisis un contrat d'options adapté au cycle de vie demandé et documente-le.
 - Ne pas dupliquer une valeur globale dans plusieurs fichiers si cela crée des divergences. Si un réglage partagé est nécessaire, le rendre explicitement commun, indiquer les fonctionnalités qui en dépendent et documenter ce couplage dans le code, la documentation et les fichiers de configuration.
-- Traiter les secrets séparément : ne jamais inscrire de secret dans un fichier suivi par Git ni dans un fichier JSON d'exemple. Les secrets de runtime peuvent être conservés en clair dans un fichier JSON local non suivi, dont l'accès est restreint au compte de l'application. En CI/CD, fournir ce JSON via un stockage/artefact de secrets protégé et le rendre disponible comme fichier au runtime ; ne pas injecter sa valeur par variable d'environnement. Ne pas prétendre que l'exclusion Git chiffre le fichier.
+- Traiter séparément les secrets confidentiels : ne jamais les inscrire dans un fichier suivi par Git ni dans un fichier JSON d'exemple. Les clés API publiques de services gratuits font exception selon la décision actuelle du projet et peuvent être conservées dans les settings suivis ; si leur statut change, les déplacer vers un fichier JSON local protégé. Les autres secrets de runtime peuvent être conservés en clair dans un fichier JSON local non suivi, dont l'accès est restreint au compte de l'application. En CI/CD, fournir ce JSON via un stockage/artefact de secrets protégé et le rendre disponible comme fichier au runtime ; ne pas injecter sa valeur par variable d'environnement. Ne pas prétendre que l'exclusion Git chiffre le fichier.
 - Définir et tester les valeurs absentes, invalides, par défaut et les changements de configuration à chaud si cette capacité est demandée. Ne pas appliquer silencieusement une valeur de repli qui modifie les résultats métier.
 
 ## 9. Observabilité et audit
@@ -155,6 +156,7 @@ Les tests doivent d'abord démontrer que l'application remplit correctement son 
 - Mettre à jour la documentation directement liée au comportement modifié.
 - Fournir un exemple d'utilisation pour toute fonctionnalité nouvellement exposée lorsque cela est pertinent.
 - Documenter configuration, prérequis, limites, hypothèses et étapes de validation.
+- Pour une démo, utiliser les settings du projet source sans override local ; ne créer un fichier local distinct que pour configurer une dépendance sans fichier source propre. Un override n'est permis que dans un mock de test.
 - Documenter chaque fichier JSON, la fonctionnalité propriétaire de ses paramètres, les valeurs par défaut et les éventuels couplages partagés.
 - Documenter les catégories d'audit/observabilité, la corrélation, les règles de rétention et la manière de consulter les runs dans la GUI.
 - Garder les diagrammes et guides alignés avec le code réellement livré.

@@ -15,6 +15,8 @@ Pour créer ou modifier les fichiers de configuration fonctionnels, suis égalem
 
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : garde le changement aussi local que possible, suis les contrats consommateurs et les effets sur les fonctionnalités, et demande confirmation avant de modifier l'architecture de persistance ou un schéma/contrat partagé avec un impact global non explicitement demandé. Après accord, adapte tous les usages directement affectés dans le périmètre accepté.
 
+Pour toute démo, utilise toujours directement les fichiers de settings définis dans les projets source lorsqu'ils existent, sans les remplacer ni les fusionner avec des overrides locaux. Un fichier local séparé peut uniquement configurer une dépendance distincte qui ne possède pas ses propres settings source ; les overrides des settings source sont réservés aux mocks de test.
+
 Garde les projets en .NET 10 (`net10.0` ou le TFM réellement requis). Pour EF Core, Redis et les autres packages NuGet touchés, vise la dernière version stable compatible ; mets à jour les dépendances liées si nécessaire, et si la dernière version reste impraticable, utilise la plus récente compatible en expliquant la contrainte.
 
 Dans l'ordre de développement indicatif, ce socle précède les workflows d'ingestion ou de backtest qui en dépendent. Sépare les projets par responsabilité (par exemple persistance SQL Server, archive JSON, cache Redis) dans le répertoire thématique `Data` ou son équivalent existant ; ne crée pas un projet partagé générique qui mélange ces responsabilités.

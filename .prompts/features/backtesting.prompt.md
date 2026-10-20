@@ -13,6 +13,8 @@ Applique la philosophie de traitement vectoriel des pratiques communes : représ
 
 Applique le cadrage de portée et d'impact décrit dans les pratiques communes : garde le changement aussi local que possible, suis le parcours complet stratégie → replay → exécution → résultats/persistance → GUI, et demande confirmation avant de changer l'architecture ou les contrats partagés du moteur ou d'étendre son impact global.
 
+Pour toute démo, utilise toujours directement les fichiers de settings définis dans les projets source lorsqu'ils existent, sans les remplacer ni les fusionner avec des overrides locaux. Un fichier local séparé peut uniquement configurer une dépendance distincte qui ne possède pas ses propres settings source ; les overrides des settings source sont réservés aux mocks de test.
+
 Maintiens les projets en .NET 10. Pour les packages NuGet du moteur, de sérialisation ou d'exécution concernés par le changement, choisis la dernière version stable compatible ; mets à jour les dépendances nécessaires si elle ne convient pas, et documente le recours à la version stable la plus récente compatible si l'obstacle demeure.
 
 Développe le workflow après les contrats et services de données/pricing dont le scénario demandé a besoin, puis intègre scripting et UI à partir de contrats stables. Regroupe le code dans des projets à responsabilité unique sous `Backtesting` (ou répertoire thématique existant) ; ne fusionne pas moteur, stockage et interface.
