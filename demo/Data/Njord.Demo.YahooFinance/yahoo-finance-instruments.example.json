@@ -1,0 +1,50 @@
+[
+  {
+    "Ticker": "AAPL",
+    "Provider": "YahooFinance",
+    "ProviderTicker": "AAPL",
+    "AssetClass": "Stock",
+    "StartDate": "2000-01-01T00:00:00",
+    "EndDate": "2035-12-31T00:00:00"
+  },
+  {
+    "Ticker": "SPX",
+    "Provider": "YahooFinance",
+    "ProviderTicker": "^GSPC",
+    "AssetClass": "Index",
+    "StartDate": "2000-01-01T00:00:00",
+    "EndDate": "2035-12-31T00:00:00"
+  },
+  {
+    "Ticker": "AAPL=2025-01-17C250000",
+    "Provider": "YahooFinance",
+    "ProviderTicker": "AAPL250117C00250000",
+    "AssetClass": "Option",
+    "StartDate": "2024-12-01T00:00:00",
+    "EndDate": "2025-01-17T00:00:00"
+  },
+  {
+    "Ticker": "ES-CONTINUOUS",
+    "Provider": "YahooFinance",
+    "ProviderTicker": "ES=F",
+    "AssetClass": "Future",
+    "StartDate": "2000-01-01T00:00:00",
+    "EndDate": "2035-12-31T00:00:00"
+  },
+  {
+    "Ticker": "BTC-USD",
+    "Provider": "YahooFinance",
+    "ProviderTicker": "BTC-USD",
+    "AssetClass": "Crypto",
+    "StartDate": "2014-01-01T00:00:00",
+    "EndDate": "2035-12-31T00:00:00"
+  },
+  {
+    "Ticker": "EURUSD",
+    "Provider": "YahooFinance",
+    "ProviderTicker": "EURUSD=X",
+    "AssetClass": "Forex",
+    "StartDate": "2000-01-01T00:00:00",
+    "EndDate": "2035-12-31T00:00:00"
+  }
+]
