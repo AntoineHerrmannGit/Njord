@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Njord.DataProviders.Massive.Serialization;
 
-internal sealed class MassiveAggregateResponseDto
+internal sealed class MassiveAggregateResponseDto : IMassivePagedResponseDto<MassiveAggregateDto>
 {
     #region Response metadata
 

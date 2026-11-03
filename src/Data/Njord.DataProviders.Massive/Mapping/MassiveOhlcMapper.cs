@@ -77,7 +77,7 @@ internal sealed class MassiveOhlcMapper : IMapper<MassiveOhlcMappingInput, IRead
             Volume = volume,
             VolumeWeightedAveragePrice = aggregate.VolumeWeightedAveragePrice,
             TransactionCount = transactions,
-            IsAdjusted = isAdjusted
+            IsAdjusted = isAdjusted ?? request.Adjusted
         };
     }
 

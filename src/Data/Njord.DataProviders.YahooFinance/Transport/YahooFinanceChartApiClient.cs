@@ -43,10 +43,11 @@ internal sealed class YahooFinanceChartApiClient : IYahooFinanceChartApiClient
 
     public async Task<YahooFinanceChartResultDto> GetHistoricalChartAsync(
         YahooFinanceResolvedOhlcRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeCorporateActions = false)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var requestUri = BuildChartUri(request);
+        var requestUri = BuildChartUri(request, includeCorporateActions);
 
         try
         {
@@ -122,14 +123,17 @@ internal sealed class YahooFinanceChartApiClient : IYahooFinanceChartApiClient
         }
     }
 
-    private static Uri BuildChartUri(YahooFinanceResolvedOhlcRequest request)
+    private static Uri BuildChartUri(
+        YahooFinanceResolvedOhlcRequest request,
+        bool includeCorporateActions)
     {
         var period1 = ToUnixSeconds(request.From);
         var period2 = ToUnixSeconds(request.To.AddDays(1));
         var escapedTicker = Uri.EscapeDataString(request.Ticker);
+        var events = includeCorporateActions ? "&events=div%2Csplits" : string.Empty;
         var relativeUri = string.Create(
             CultureInfo.InvariantCulture,
-            $"v8/finance/chart/{escapedTicker}?period1={period1}&period2={period2}&interval={request.Interval}");
+            $"v8/finance/chart/{escapedTicker}?period1={period1}&period2={period2}&interval={request.Interval}&includeAdjustedClose=false{events}");
         return new Uri(relativeUri, UriKind.Relative);
     }
 

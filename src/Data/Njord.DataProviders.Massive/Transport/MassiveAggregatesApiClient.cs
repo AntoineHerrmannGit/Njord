@@ -12,7 +12,9 @@ using Njord.DataProviders.Massive.Serialization;
 
 namespace Njord.DataProviders.Massive.Transport;
 
-internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
+internal sealed class MassiveAggregatesApiClient :
+    IMassiveAggregatesApiClient,
+    IMassiveCorporateActionsApiClient
 {
     #region Client configuration
 
@@ -59,7 +61,10 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
                 throw new MassiveDataProviderException(
                     $"Massive pagination exceeded the configured maximum of {_options.MaximumPagesPerQuery} pages.");
 
-            var page = await SendPageAsync(nextPage, cancellationToken).ConfigureAwait(false);
+            var page = await SendPageAsync<MassiveAggregateResponseDto>(
+                nextPage,
+                "aggregate",
+                cancellationToken).ConfigureAwait(false);
             if (page.Results is null)
                 throw new MassiveDataProviderException(
                     "Massive returned a response without a results array.",
@@ -76,14 +81,110 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
         return pages.AsReadOnly();
     }
 
-    private async Task<MassiveAggregateResponseDto> SendPageAsync(
-        Uri requestUri,
+    public Task<IReadOnlyList<MassiveStockSplitDto>> GetHistoricalStockSplitsAsync(
+        string ticker,
+        DateOnly from,
+        DateOnly to,
+        CancellationToken cancellationToken) =>
+        GetHistoricalResultsAsync<MassiveStockSplitDto, MassiveStockSplitResponseDto>(
+            BuildCorporateActionUri("splits", ticker, "execution_date", from, to),
+            "stock split",
+            cancellationToken);
+
+    public Task<IReadOnlyList<MassiveStockDividendDto>> GetHistoricalStockDividendsAsync(
+        string ticker,
+        DateOnly from,
+        DateOnly to,
+        CancellationToken cancellationToken) =>
+        GetHistoricalResultsAsync<MassiveStockDividendDto, MassiveStockDividendResponseDto>(
+            BuildCorporateActionUri("dividends", ticker, "ex_dividend_date", from, to),
+            "stock dividend",
+            cancellationToken);
+
+    public Task<IReadOnlyList<MassiveStockIpoDto>> GetHistoricalStockIposAsync(
+        string ticker,
+        DateOnly from,
+        DateOnly to,
+        CancellationToken cancellationToken) =>
+        GetHistoricalResultsAsync<MassiveStockIpoDto, MassiveStockIpoResponseDto>(
+            BuildIpoUri(ticker, from, to),
+            "stock IPO",
+            cancellationToken);
+
+    public async Task<IReadOnlyList<MassiveTickerEventDto>> GetTickerEventsAsync(
+        string ticker,
         CancellationToken cancellationToken)
+    {
+        var events = new List<MassiveTickerEventDto>();
+        var nextPage = BuildTickerEventsUri(ticker);
+        var pageCount = 0;
+
+        while (nextPage is not null)
+        {
+            if (pageCount >= _options.MaximumPagesPerQuery)
+                throw new MassiveDataProviderException(
+                    $"Massive ticker-event pagination exceeded the configured maximum of {_options.MaximumPagesPerQuery} pages.");
+
+            var response = await SendPageAsync<MassiveTickerEventsResponseDto>(
+                nextPage,
+                "ticker event",
+                cancellationToken).ConfigureAwait(false);
+            pageCount++;
+            if (response.Results?.Events is null)
+                throw new MassiveDataProviderException(
+                    "Massive returned a ticker event response without an events array.",
+                    requestId: response.RequestId);
+
+            events.AddRange(response.Results.Events);
+            nextPage = GetNextPageUri(response.NextUrl);
+        }
+
+        return events.AsReadOnly();
+    }
+
+    private async Task<IReadOnlyList<TItem>> GetHistoricalResultsAsync<TItem, TResponse>(
+        Uri firstPageUri,
+        string responseType,
+        CancellationToken cancellationToken)
+        where TResponse : class, IMassivePagedResponseDto<TItem>
+    {
+        var results = new List<TItem>();
+        var nextPage = firstPageUri;
+        var pageCount = 0;
+
+        while (nextPage is not null)
+        {
+            if (pageCount >= _options.MaximumPagesPerQuery)
+                throw new MassiveDataProviderException(
+                    $"Massive {responseType} pagination exceeded the configured maximum of {_options.MaximumPagesPerQuery} pages.");
+
+            var page = await SendPageAsync<TResponse>(
+                nextPage,
+                responseType,
+                cancellationToken).ConfigureAwait(false);
+            pageCount++;
+            if (page.Results is null)
+                throw new MassiveDataProviderException(
+                    $"Massive returned a {responseType} response without a results array.",
+                    requestId: page.RequestId);
+
+            results.AddRange(page.Results);
+            nextPage = GetNextPageUri(page.NextUrl);
+        }
+
+        return results.AsReadOnly();
+    }
+
+    private async Task<TResponse> SendPageAsync<TResponse>(
+        Uri requestUri,
+        string responseType,
+        CancellationToken cancellationToken)
+        where TResponse : class, IMassiveApiResponseDto
     {
         try
         {
             return await _retryPolicy.ExecuteAsync(
-                token => SendPageAttemptAsync(requestUri, token),
+                token => SendPageAttemptAsync<TResponse>(requestUri, responseType, token),
                 exception => IsRetryable(exception, cancellationToken),
                 GetRetryAfter,
                 cancellationToken).ConfigureAwait(false);
@@ -110,9 +211,11 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
         }
     }
 
-    private async Task<MassiveAggregateResponseDto> SendPageAttemptAsync(
+    private async Task<TResponse> SendPageAttemptAsync<TResponse>(
         Uri requestUri,
+        string responseType,
         CancellationToken cancellationToken)
+        where TResponse : class, IMassiveApiResponseDto
     {
         var isProbe = _circuitBreaker.ThrowIfOpenAndAcquireProbe();
 
@@ -140,23 +243,33 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
             if (!response.IsSuccessStatusCode)
             {
                 _circuitBreaker.RecordSuccess();
+                var errorResponse = await TryReadErrorResponseAsync(response, cancellationToken)
+                    .ConfigureAwait(false);
+                var errorRequestId = GetRequestId(response) ?? errorResponse?.RequestId;
+                var details = errorResponse?.Error ?? errorResponse?.Message;
+                var message = response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+                    ? $"Massive denied access (HTTP {(int)response.StatusCode}). Verify the configured API key and account access to this endpoint."
+                    : $"Massive returned HTTP status {(int)response.StatusCode}.";
+                if (!string.IsNullOrWhiteSpace(details))
+                    message = $"{message} Massive detail: {details}";
+
                 throw new MassiveDataProviderException(
-                    $"Massive returned HTTP status {(int)response.StatusCode}.",
+                    message,
                     response.StatusCode,
-                    requestId);
+                    errorRequestId);
             }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            MassiveAggregateResponseDto? result;
+            TResponse? result;
             try
             {
-                result = json.Déserialize<MassiveAggregateResponseDto>();
+                result = json.Déserialize<TResponse>();
             }
             catch (JsonException exception)
             {
                 _circuitBreaker.RecordSuccess();
                 throw new MassiveDataProviderException(
-                    "Massive returned malformed aggregate JSON.",
+                    $"Massive returned malformed {responseType} JSON.",
                     response.StatusCode,
                     requestId,
                     exception);
@@ -166,7 +279,7 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
             {
                 _circuitBreaker.RecordSuccess();
                 throw new MassiveDataProviderException(
-                    "Massive returned an empty aggregate response.",
+                    $"Massive returned an empty {responseType} response.",
                     response.StatusCode,
                     requestId);
             }
@@ -264,6 +377,55 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
         return CreateUri(relativePath, query);
     }
 
+    private Uri BuildCorporateActionUri(
+        string endpoint,
+        string ticker,
+        string dateParameter,
+        DateOnly from,
+        DateOnly to)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ticker);
+        if (from > to)
+            throw new ArgumentException("The start date must not be after the end date.");
+
+        var query =
+            new List<KeyValuePair<string, string>>
+            {
+                new("ticker", ticker),
+                new($"{dateParameter}.gte", from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                new($"{dateParameter}.lte", to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                new("limit", "5000"),
+                new("sort", $"{dateParameter}.asc")
+            };
+        return CreateUri($"stocks/v1/{endpoint}", query);
+    }
+
+    private Uri BuildIpoUri(string ticker, DateOnly from, DateOnly to)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ticker);
+        if (from > to)
+            throw new ArgumentException("The start date must not be after the end date.");
+
+        var query =
+            new List<KeyValuePair<string, string>>
+            {
+                new("ticker", ticker),
+                new("listing_date.gte", from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                new("listing_date.lte", to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                new("limit", "1000"),
+                new("sort", "listing_date"),
+                new("order", "asc")
+            };
+        return CreateUri("vX/reference/ipos", query);
+    }
+
+    private Uri BuildTickerEventsUri(string ticker)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ticker);
+        var escapedTicker = Uri.EscapeDataString(ticker);
+        return new Uri(_options.BaseAddress!, $"vX/reference/tickers/{escapedTicker}/events?types=ticker_change");
+    }
+
     private Uri CreateUri(string relativePath, IEnumerable<KeyValuePair<string, string>> query)
     {
         var uri = new Uri(_options.BaseAddress!, relativePath);
@@ -325,6 +487,24 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
     private static bool IsTransient(HttpStatusCode statusCode) =>
         statusCode == HttpStatusCode.RequestTimeout ||
         (int)statusCode >= 500;
+
+    private static async Task<MassiveErrorResponseDto?> TryReadErrorResponseAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            return json.Déserialize<MassiveErrorResponseDto>();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private string? GetRequestId(HttpResponseMessage response) =>
         response.Headers.TryGetValues("request_id", out var values)

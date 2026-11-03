@@ -25,3 +25,31 @@ Les DTO externes, la validation des réponses, les règles de conversion et les 
 5. Tester les conversions, les entrées invalides et les erreurs propres au contrat de l'adaptateur.
 
 Ne pas utiliser ce contrat pour abstraire des comportements asynchrones, des workflows ou des règles qui ont des responsabilités différentes.
+
+## Contrats de fournisseurs de données marché
+
+`Njord.Data.MarketData` expose le marqueur métier `IMarketData`, les contrats
+génériques `IMarketDataRequest<TMarketData>`,
+`IMarketDataResult<TMarketData>` et
+`IMarketDataProvider<TSupportedMarketData>`, ainsi que l'interface OHLC
+historique non générique conservée pour compatibilité. Chaque requête associe
+statiquement le type demandé ; les résultats génériques exposent le ticker,
+les données et les diagnostics communs. Les résultats OHLC et corporate action
+conservent leurs propriétés spécialisées et publient `Data` comme alias de leur
+snapshot.
+
+Massive et Yahoo Finance enregistrent `IMarketDataProvider<IMarketData>` et
+dispatchent les demandes OHLC et corporate action vers leurs chemins communs
+existants, préservant les résultats et diagnostics par ticker. Toute
+combinaison requête/type inconnue est explicitement rejetée. Les deux adaptateurs
+continuent aussi d'enregistrer `IMarketDataProvider` pour compatibilité.
+`MarketDataProviderSelector` sélectionne via cette interface historique ;
+l'application reste responsable de l'enregistrement et du choix du provider.
+
+La capacité facultative `ICorporateActionProvider` représente les événements
+source sans calculer de facteur d'ajustement. Les deux adaptateurs exposent
+leur couverture limitée par des diagnostics. La comparaison OHLC exige une
+devise connue et identique, un fuseau valide, une base de prix explicitement
+non ajustée et des séances appariées. Les métadonnées actuellement
+indisponibles ou non prouvées pour les providers rendent donc la comparaison
+réelle non concluante ; il ne faut pas en déduire une validation financière.

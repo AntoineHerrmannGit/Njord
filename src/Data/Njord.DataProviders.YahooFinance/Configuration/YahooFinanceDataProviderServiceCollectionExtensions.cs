@@ -3,10 +3,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Njord.Core.Mapping;
+using Njord.Data.MarketData;
+using Njord.Data.MarketData.Contracts;
 using Njord.DataProviders.YahooFinance.Contracts;
 using Njord.DataProviders.YahooFinance.Mapping;
 using Njord.DataProviders.YahooFinance.Provider;
 using Njord.DataProviders.YahooFinance.Transport;
+using Njord.Models.MarketData;
 
 namespace Njord.DataProviders.YahooFinance.Configuration;
 
@@ -50,7 +53,16 @@ public static class YahooFinanceDataProviderServiceCollectionExtensions
         services.AddSingleton<
             IMapper<YahooFinanceHistoricalOhlcRequest, YahooFinanceIntervalMapping>,
             YahooFinanceIntervalMapper>();
-        services.AddTransient<IYahooFinanceHistoricalMarketDataProvider, YahooFinanceHistoricalMarketDataProvider>();
+        services.TryAddTransient<MarketDataProviderSelector>();
+        services.AddTransient<YahooFinanceHistoricalMarketDataProvider>();
+        services.AddTransient<IYahooFinanceHistoricalMarketDataProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<YahooFinanceHistoricalMarketDataProvider>());
+        services.AddTransient<IMarketDataProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<YahooFinanceHistoricalMarketDataProvider>());
+        services.AddTransient<IMarketDataProvider<IMarketData>>(serviceProvider =>
+            serviceProvider.GetRequiredService<YahooFinanceHistoricalMarketDataProvider>());
+        services.AddTransient<ICorporateActionProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<YahooFinanceHistoricalMarketDataProvider>());
 
         return services;
     }

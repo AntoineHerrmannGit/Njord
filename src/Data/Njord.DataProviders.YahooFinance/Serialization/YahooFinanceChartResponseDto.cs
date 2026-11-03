@@ -48,6 +48,9 @@ internal sealed class YahooFinanceChartResultDto
     [JsonPropertyName("timestamp")]
     public List<long>? Timestamps { get; set; }
 
+    [JsonPropertyName("events")]
+    public YahooFinanceChartEventsDto? Events { get; set; }
+
     [JsonPropertyName("indicators")]
     public YahooFinanceChartIndicatorsDto? Indicators { get; set; }
 
@@ -64,6 +67,9 @@ internal sealed class YahooFinanceChartMetadataDto
     [JsonPropertyName("currency")]
     public string? Currency { get; set; }
 
+    [JsonPropertyName("exchangeTimezoneName")]
+    public string? ExchangeTimeZoneName { get; set; }
+
     #endregion
 }
 
@@ -73,6 +79,51 @@ internal sealed class YahooFinanceChartIndicatorsDto
 
     [JsonPropertyName("quote")]
     public List<YahooFinanceQuoteDto>? Quote { get; set; }
+
+    #endregion
+}
+
+internal sealed class YahooFinanceChartEventsDto
+{
+    #region Corporate actions
+
+    [JsonPropertyName("dividends")]
+    public Dictionary<string, YahooFinanceDividendEventDto>? Dividends { get; set; }
+
+    [JsonPropertyName("splits")]
+    public Dictionary<string, YahooFinanceSplitEventDto>? Splits { get; set; }
+
+    #endregion
+}
+
+internal sealed class YahooFinanceDividendEventDto
+{
+    #region Dividend event
+
+    [JsonPropertyName("date")]
+    public long? Date { get; set; }
+
+    [JsonPropertyName("amount")]
+    public decimal? Amount { get; set; }
+
+    #endregion
+}
+
+internal sealed class YahooFinanceSplitEventDto
+{
+    #region Split event
+
+    [JsonPropertyName("date")]
+    public long? Date { get; set; }
+
+    [JsonPropertyName("numerator")]
+    public decimal? Numerator { get; set; }
+
+    [JsonPropertyName("denominator")]
+    public decimal? Denominator { get; set; }
+
+    [JsonPropertyName("splitRatio")]
+    public string? SplitRatio { get; set; }
 
     #endregion
 }

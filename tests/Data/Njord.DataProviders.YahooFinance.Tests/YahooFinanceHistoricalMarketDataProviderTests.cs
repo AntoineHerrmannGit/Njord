@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Njord.Data.MarketData;
+using Njord.Data.MarketData.Contracts;
 using Njord.Data.Referential.Contracts;
 using Njord.Data.Referential.Errors;
 using Njord.Data.Referential.Models;
@@ -14,6 +16,7 @@ using Njord.DataProviders.YahooFinance.Mapping;
 using Njord.DataProviders.YahooFinance.Provider;
 using Njord.DataProviders.YahooFinance.Transport;
 using Njord.Data.Tests.Shared;
+using Njord.Models.MarketData;
 
 namespace Njord.DataProviders.YahooFinance.Tests;
 
@@ -49,10 +52,12 @@ public sealed class YahooFinanceHistoricalMarketDataProviderTests
         Assert.Contains("period1=", sentRequest.Uri.Query, StringComparison.Ordinal);
         Assert.Contains("period2=", sentRequest.Uri.Query, StringComparison.Ordinal);
         Assert.Contains("interval=1d", sentRequest.Uri.Query, StringComparison.Ordinal);
+        Assert.Contains("includeAdjustedClose=false", sentRequest.Uri.Query, StringComparison.Ordinal);
         Assert.Equal("Njord/1.0", sentRequest.UserAgent);
 
         var result = Assert.Single(results);
         Assert.Empty(result.Diagnostics);
+        Assert.Equal("America/New_York", result.ExchangeTimeZoneId);
         var bar = Assert.Single(result.Bars);
         Assert.Equal(njordTicker, bar.Ticker);
         Assert.Equal(10.25m, bar.Open);
@@ -148,9 +153,162 @@ public sealed class YahooFinanceHistoricalMarketDataProviderTests
 
         var provider = serviceProvider.GetRequiredService<IYahooFinanceHistoricalMarketDataProvider>();
         var results = await provider.GetHistoricalOhlcAsync(CreateRequest("AAPL"));
+        var commonProvider = Assert.Single(serviceProvider.GetServices<IMarketDataProvider>());
+        var genericProvider = Assert.Single(
+            serviceProvider.GetServices<IMarketDataProvider<IMarketData>>());
+        var selector = serviceProvider.GetRequiredService<MarketDataProviderSelector>();
 
         Assert.Single(Assert.Single(results).Bars);
         Assert.Single(handler.Requests);
+        Assert.Equal("YahooFinance", commonProvider.ProviderName);
+        Assert.Equal("YahooFinance", genericProvider.ProviderName);
+        Assert.Equal("YahooFinance", selector.GetProvider("yahoofinance").ProviderName);
+        Assert.IsAssignableFrom<ICorporateActionProvider>(
+            serviceProvider.GetRequiredService<ICorporateActionProvider>());
+    }
+
+    [Fact]
+    public async Task GenericContract_ReturnsBarsAndExchangeTimezoneInRequestOrder()
+    {
+        var handler = new QueueHttpMessageHandler(
+            JsonResponse(ChartResponse("AAPL")),
+            JsonResponse(ChartResponse("MSFT")));
+        var provider = CreateProvider(handler);
+
+        var results = await provider.Get<Ohlc>(new MarketDataHistoricalOhlcRequest
+        {
+            Tickers = ["AAPL", "MSFT"],
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 31),
+            Multiplier = 1,
+            Interval = MarketDataInterval.Day
+        });
+
+        Assert.Equal(["AAPL", "MSFT"], results.Select(result => result.Ticker));
+        var result = results[0];
+        Assert.Equal("YahooFinance", provider.ProviderName);
+        Assert.Equal("AAPL", result.Ticker);
+        Assert.Equal("America/New_York", Assert.IsType<MarketDataTickerOhlcResult>(result).ExchangeTimeZoneId);
+        Assert.Single(result.Data);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(results[1].Diagnostics);
+        Assert.Equal("MSFT", Assert.Single(results[1].Data).Ticker);
+    }
+
+    [Fact]
+    public async Task GenericContract_RejectsUnknownRequestTypesExplicitly()
+    {
+        var handler = new QueueHttpMessageHandler();
+        var provider = CreateProvider(handler);
+
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.Get<Ohlc>(new UnsupportedOhlcRequest()));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task CommonContract_RejectsUnsupportedIntervalsWithoutCallingYahoo()
+    {
+        var handler = new QueueHttpMessageHandler();
+        var provider = CreateProvider(handler);
+        var request = new MarketDataHistoricalOhlcRequest
+        {
+            Tickers = ["AAPL"],
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 31),
+            Multiplier = 1,
+            Interval = MarketDataInterval.Year
+        };
+
+        await Assert.ThrowsAsync<YahooFinanceDataProviderException>(
+            () => provider.GetHistoricalOhlcAsync(request));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GenericContract_MapsChartSplitsAndDividendsWithoutAdjustedClose()
+    {
+        var response = $$"""
+            {
+              "chart": {
+                "result": [{
+                  "meta": {
+                    "symbol": "AAPL",
+                    "exchangeTimezoneName": "America/New_York"
+                  },
+                  "events": {
+                    "dividends": {
+                      "{{GetTimestamp(3)}}": {
+                        "amount": 0.25,
+                        "date": {{GetTimestamp(3)}}
+                      }
+                    },
+                    "splits": {
+                      "{{GetTimestamp(4)}}": {
+                        "date": {{GetTimestamp(4)}},
+                        "numerator": 4,
+                        "denominator": 1,
+                        "splitRatio": "4:1"
+                      }
+                    }
+                  }
+                }],
+                "error": null
+              }
+            }
+            """;
+        var handler = new QueueHttpMessageHandler(JsonResponse(response));
+        var provider = CreateProvider(handler);
+
+        var results = await provider.Get<MarketCorporateAction>(new CorporateActionHistoricalRequest
+        {
+            Tickers = ["AAPL", "UNMAPPED"],
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 31)
+        });
+
+        Assert.Equal(["AAPL", "UNMAPPED"], results.Select(result => result.Ticker));
+        var result = results[0];
+        Assert.Equal(
+            [CorporateActionKind.Dividend, CorporateActionKind.Split],
+            result.Data.Select(action => action.Kind));
+        Assert.IsType<MarketDataTickerCorporateActionResult>(result);
+        Assert.Equal(0.25m, result.Data[0].DividendAmount);
+        Assert.Equal(new DateOnly(2025, 1, 3), result.Data[0].ExDividendDate);
+        Assert.False(string.IsNullOrWhiteSpace(result.Data[0].EventId));
+        Assert.Equal("4:1", result.Data[1].SplitRatio);
+        Assert.Equal(1m, result.Data[1].SplitFrom);
+        Assert.Equal(4m, result.Data[1].SplitTo);
+        Assert.False(string.IsNullOrWhiteSpace(result.Data[1].EventId));
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "UnsupportedActionTypes");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "NoCorporateActions");
+        Assert.Empty(results[1].Data);
+        Assert.Contains(results[1].Diagnostics, diagnostic => diagnostic.Code == "TickerMappingError");
+
+        var requestUri = Assert.Single(handler.Requests).Uri!;
+        Assert.Contains("includeAdjustedClose=false", requestUri.Query, StringComparison.Ordinal);
+        Assert.Contains("events=div%2Csplits", requestUri.Query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetCorporateActionsAsync_DoesNotReportNoActionsWhenYahooRequestFails()
+    {
+        var handler = new QueueHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.NotFound));
+        var provider = CreateProvider(handler);
+
+        var result = Assert.Single(await provider.GetCorporateActionsAsync(
+            new CorporateActionHistoricalRequest
+            {
+                Tickers = ["AAPL"],
+                From = new DateOnly(2025, 1, 1),
+                To = new DateOnly(2025, 1, 31)
+            }));
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "HttpError");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "NoCorporateActions");
     }
 
     [Fact]
@@ -197,7 +355,11 @@ public sealed class YahooFinanceHistoricalMarketDataProviderTests
             {
               "chart": {
                 "result": [{
-                  "meta": { "symbol": "AAPL", "currency": "USD" },
+                  "meta": {
+                    "symbol": "AAPL",
+                    "currency": "USD",
+                    "exchangeTimezoneName": "America/New_York"
+                  },
                   "timestamp": [1735828200, 1735914600],
                   "indicators": {
                     "quote": [{
@@ -396,7 +558,11 @@ public sealed class YahooFinanceHistoricalMarketDataProviderTests
           {
             "chart": {
               "result": [{
-                "meta": { "symbol": "{{symbol}}", "currency": "USD" },
+                "meta": {
+                  "symbol": "{{symbol}}",
+                  "currency": "USD",
+                  "exchangeTimezoneName": "America/New_York"
+                },
                 "timestamp": [{{timestamp}}],
                 "indicators": {
                   "quote": [{
@@ -418,6 +584,10 @@ public sealed class YahooFinanceHistoricalMarketDataProviderTests
 
     private static HttpResponseMessage JsonResponse(string json) =>
         HttpTestResponses.JsonResponse(json);
+
+    private sealed class UnsupportedOhlcRequest : IMarketDataRequest<Ohlc>
+    {
+    }
 
     private sealed class QueueHttpMessageHandler : QueuedHttpMessageHandler<RequestSnapshot>
     {

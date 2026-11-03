@@ -12,6 +12,7 @@
 *.env
 massive.settings.local.json
 referential.settings.local.json
+massive-referential.settings.local.json
 /data/referential/
 
 # User-specific files (MonoDevelop/Xamarin Studio)

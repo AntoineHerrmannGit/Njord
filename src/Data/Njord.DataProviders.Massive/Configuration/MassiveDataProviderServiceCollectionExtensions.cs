@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Njord.Core.Mapping;
 using Njord.Core.Retry;
+using Njord.Data.MarketData;
+using Njord.Data.MarketData.Contracts;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Mapping;
 using Njord.DataProviders.Massive.Provider;
@@ -45,17 +47,24 @@ public static class MassiveDataProviderServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<MassiveCircuitBreaker>();
         services.AddSingleton<RetryPolicy>();
+        services.AddTransient<MassiveAggregatesApiClient>();
         services.AddTransient<IMassiveAggregatesApiClient>(serviceProvider =>
-            new MassiveAggregatesApiClient(
-                serviceProvider.GetRequiredService<IHttpClientFactory>(),
-                serviceProvider.GetRequiredService<IOptions<MassiveDataProviderOptions>>(),
-                serviceProvider.GetRequiredService<RetryPolicy>(),
-                serviceProvider.GetRequiredService<MassiveCircuitBreaker>(),
-                serviceProvider.GetRequiredService<TimeProvider>()));
+            serviceProvider.GetRequiredService<MassiveAggregatesApiClient>());
+        services.AddTransient<IMassiveCorporateActionsApiClient>(serviceProvider =>
+            serviceProvider.GetRequiredService<MassiveAggregatesApiClient>());
         services.AddSingleton<
             IMapper<MassiveOhlcMappingInput, IReadOnlyList<Ohlc>>,
             MassiveOhlcMapper>();
-        services.AddTransient<IMassiveHistoricalMarketDataProvider, MassiveHistoricalMarketDataProvider>();
+        services.TryAddTransient<MarketDataProviderSelector>();
+        services.AddTransient<MassiveHistoricalMarketDataProvider>();
+        services.AddTransient<IMassiveHistoricalMarketDataProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<MassiveHistoricalMarketDataProvider>());
+        services.AddTransient<IMarketDataProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<MassiveHistoricalMarketDataProvider>());
+        services.AddTransient<IMarketDataProvider<IMarketData>>(serviceProvider =>
+            serviceProvider.GetRequiredService<MassiveHistoricalMarketDataProvider>());
+        services.AddTransient<ICorporateActionProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<MassiveHistoricalMarketDataProvider>());
 
         return services;
     }

@@ -18,7 +18,24 @@ Supported intervals are 1, 2, 5, 15, 30, 60, or 90 minutes; 1 hour; 1 or 5 days;
 
 `From` and `To` are UTC calendar dates, both inclusive. The adapter sends Yahoo's `period1` at midnight on `From` and exclusive `period2` at midnight after `To`. Bar timestamps are returned as UTC `DateTimeOffset` values. The referential remains authoritative for canonical tickers, Yahoo symbols, asset classes, and mapping validity periods.
 
-Yahoo's chart response provides OHLC, optional volume, and optional currency. It does not provide a reliable VWAP, transaction count, or explicit adjustment flag in the data mapped here; those model properties remain unset. The request contract does not offer a raw/adjusted-price switch.
+Yahoo's chart response provides OHLC, optional volume, optional currency, and an exchange timezone when the response includes it. It does not provide a reliable VWAP, transaction count, or explicit adjustment flag in the data mapped here; those model properties remain unset. Requests explicitly set `includeAdjustedClose=false`, so the separate adjusted-close series is not requested. This parameter does not prove that Yahoo's OHLC series is raw: its adjustment basis remains unknown, and a raw-price comparison must treat it as inconclusive unless raw prices are independently established. The provider does not reconstruct an as-traded series from adjusted data.
+
+## Common provider and corporate-action contracts
+
+`YahooFinanceHistoricalMarketDataProvider` is registered as
+`IMarketDataProvider` and `ICorporateActionProvider` in addition to the
+Yahoo-specific result contract. The common OHLC request accepts canonical
+tickers and provider-neutral intervals; unsupported intervals are rejected
+instead of being silently coerced. Applications that register multiple
+providers can inject `MarketDataProviderSelector` and select one explicitly
+by its registered name.
+
+The optional corporate-action capability requests Yahoo chart `splits` and
+`dividends` events and reports them as source-reported details. The response
+also includes the provider's exchange timezone, used to map event timestamps
+to exchange-local dates. Yahoo's chart endpoint does not supply the other
+common action types through this request; the result includes an
+`UnsupportedActionTypes` diagnostic. No price adjustments are calculated.
 
 ## Configuration and registration
 

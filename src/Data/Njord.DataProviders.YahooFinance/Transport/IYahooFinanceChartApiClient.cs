@@ -9,7 +9,8 @@ internal interface IYahooFinanceChartApiClient
 
     Task<YahooFinanceChartResultDto> GetHistoricalChartAsync(
         YahooFinanceResolvedOhlcRequest request,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool includeCorporateActions = false);
 
     #endregion
 }

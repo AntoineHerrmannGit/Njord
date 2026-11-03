@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Njord.Core.Mapping;
 using Njord.Core.Retry;
+using Njord.Data.MarketData;
+using Njord.Data.MarketData.Contracts;
 using Njord.Data.Referential.Contracts;
 using Njord.Data.Referential.Errors;
 using Njord.Data.Referential.Models;
@@ -264,6 +266,27 @@ public sealed class MassiveHistoricalMarketDataProviderTests
     }
 
     [Fact]
+    public async Task GetHistoricalOhlcAsync_ReportsMassiveErrorDetailsForForbiddenResponse()
+    {
+        const string requestId = "massive-request-403";
+        const string errorMessage = "The API key does not have access to this product.";
+        var response = new HttpResponseMessage(HttpStatusCode.Forbidden)
+        {
+            Content = new StringContent(
+                $$"""{"status":"ERROR","error":"{{errorMessage}}","request_id":"{{requestId}}"}""")
+        };
+        var provider = CreateProvider(new QueueHttpMessageHandler(response));
+
+        var exception = await Assert.ThrowsAsync<MassiveDataProviderException>(
+            () => provider.GetHistoricalOhlcAsync(CreateRequest(MassiveAssetClass.Stock, "AAPL")));
+
+        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Equal(requestId, exception.RequestId);
+        Assert.Contains("Verify the configured API key", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(errorMessage, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetHistoricalOhlcAsync_OpensCircuitAfterConfiguredTransientFailures()
     {
         var handler = new QueueHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
@@ -307,6 +330,41 @@ public sealed class MassiveHistoricalMarketDataProviderTests
 
         await Assert.ThrowsAsync<ArgumentException>(() => provider.GetHistoricalOhlcAsync(request));
         Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GetHistoricalOhlcAsync_AllowsUnadjustedFutureRequest()
+    {
+        var handler = new QueueHttpMessageHandler(JsonResponse(FuturesResponse));
+        var provider = CreateProvider(handler);
+        var request = CreateRequest(MassiveAssetClass.Future, "ES=2025-01-17") with { Adjusted = false };
+
+        var bars = await provider.GetHistoricalOhlcAsync(request);
+
+        Assert.Single(bars);
+        Assert.Null(bars[0].IsAdjusted);
+        Assert.DoesNotContain("adjusted=", handler.Requests[0].Uri!.Query, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetHistoricalOhlcAsync_ReportsRequestedRawBasisWhenMassiveOmitsAdjustmentMetadata()
+    {
+        const string response = """
+            {
+              "status": "OK",
+              "results": [
+                { "o": 10, "h": 12, "l": 9, "c": 11, "t": 1735732800000 }
+              ]
+            }
+            """;
+        var handler = new QueueHttpMessageHandler(JsonResponse(response));
+        var provider = CreateProvider(handler);
+        var request = CreateRequest(MassiveAssetClass.Stock, "AAPL") with { Adjusted = false };
+
+        var bars = await provider.GetHistoricalOhlcAsync(request);
+
+        Assert.False(Assert.Single(bars).IsAdjusted);
+        Assert.Contains("adjusted=false", handler.Requests[0].Uri!.Query, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -429,7 +487,10 @@ public sealed class MassiveHistoricalMarketDataProviderTests
             })
             .Build();
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddMassiveDataProvider(configuration);
+        services.AddSingleton<IInstrumentReferential>(
+            new StubInstrumentReferential(CreateDefaultMappings()));
 
         using var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<MassiveDataProviderOptions>>().Value;
@@ -443,6 +504,190 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         Assert.NotNull(serviceProvider.GetRequiredService<RetryPolicy>());
         Assert.NotNull(serviceProvider.GetRequiredService<
             IMapper<MassiveOhlcMappingInput, IReadOnlyList<Ohlc>>>());
+        var commonProvider = Assert.Single(serviceProvider.GetServices<IMarketDataProvider>());
+        var genericProvider = Assert.Single(
+            serviceProvider.GetServices<IMarketDataProvider<IMarketData>>());
+        var selector = serviceProvider.GetRequiredService<MarketDataProviderSelector>();
+        Assert.Equal("Massive", commonProvider.ProviderName);
+        Assert.Equal("Massive", genericProvider.ProviderName);
+        Assert.Equal("Massive", selector.GetProvider("massive").ProviderName);
+        Assert.IsAssignableFrom<ICorporateActionProvider>(
+            serviceProvider.GetRequiredService<ICorporateActionProvider>());
+    }
+
+    #endregion
+
+    #region Common provider contracts
+
+    [Fact]
+    public async Task GenericContract_ReturnsOneTypedResultPerRequestedTickerInRequestOrder()
+    {
+        const string barResponse = """
+            {
+              "status": "OK",
+              "results": [
+                { "o": 10, "h": 12, "l": 9, "c": 11, "t": 1735732800000 }
+              ]
+            }
+            """;
+        const string emptyResponse = """
+            {
+              "status": "OK",
+              "results": []
+            }
+            """;
+        var handler = new QueueHttpMessageHandler(
+            JsonResponse(barResponse),
+            JsonResponse(emptyResponse));
+        var provider = CreateProvider(handler);
+
+        var results = await provider.Get<Ohlc>(new MarketDataHistoricalOhlcRequest
+        {
+            Tickers = ["AAPL", "SPX", "UNMAPPED"],
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 31),
+            Multiplier = 1,
+            Interval = MarketDataInterval.Day
+        });
+
+        Assert.Equal("Massive", provider.ProviderName);
+        Assert.Equal(["AAPL", "SPX", "UNMAPPED"], results.Select(result => result.Ticker));
+        Assert.IsType<MarketDataTickerOhlcResult>(results[0]);
+        Assert.False(Assert.Single(results[0].Data).IsAdjusted);
+        Assert.Empty(results[0].Diagnostics);
+        Assert.Empty(results[1].Data);
+        Assert.Equal("NoData", Assert.Single(results[1].Diagnostics).Code);
+        Assert.Empty(results[2].Data);
+        Assert.Equal("TickerMappingError", Assert.Single(results[2].Diagnostics).Code);
+        Assert.All(handler.Requests, request =>
+            Assert.Contains("adjusted=false", request.Uri!.Query, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GenericContract_RejectsUnknownRequestTypesExplicitly()
+    {
+        var handler = new QueueHttpMessageHandler();
+        var provider = CreateProvider(handler);
+
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.Get<Ohlc>(new UnsupportedOhlcRequest()));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GenericContract_MapsSupportedMassiveEventsAndReportsCoverage()
+    {
+        const string splitResponse = """
+            {
+              "status": "OK",
+              "results": [{
+                "adjustment_type": "forward_split",
+                "execution_date": "2025-01-03",
+                "id": "split-1",
+                "split_from": 1,
+                "split_to": 4,
+                "ticker": "AAPL"
+              }]
+            }
+            """;
+        const string dividendResponse = """
+            {
+              "status": "OK",
+              "results": [{
+                "cash_amount": 0.25,
+                "currency": "USD",
+                "declaration_date": "2024-12-01",
+                "distribution_type": "qualified",
+                "ex_dividend_date": "2025-01-04",
+                "id": "dividend-1",
+                "pay_date": "2025-01-20",
+                "record_date": "invalid-date",
+                "ticker": "AAPL"
+              }]
+            }
+            """;
+        const string tickerEventsResponse = """
+            {
+              "status": "OK",
+              "next_url": "https://api.massive.test/vX/reference/tickers/AAPL/events?cursor=next",
+              "results": {
+                "events": [{
+                  "date": "2025-01-05",
+                  "type": "ticker_change",
+                  "ticker_change": { "ticker": "AAPL1" }
+                }]
+              }
+            }
+            """;
+        const string nextTickerEventsResponse = """
+            {
+              "status": "OK",
+              "results": {
+                "events": [{
+                  "date": "2025-01-06",
+                  "type": "ticker_change",
+                  "ticker_change": { "ticker": "AAPL2" }
+                }]
+              }
+            }
+            """;
+        const string ipoResponse = """
+            {
+              "status": "OK",
+              "results": [{
+                "announced_date": "2024-12-01",
+                "currency_code": "USD",
+                "ipo_status": "listed",
+                "issuer_name": "Apple Inc.",
+                "listing_date": "2025-01-06",
+                "primary_exchange": "XNAS",
+                "ticker": "AAPL"
+              }]
+            }
+            """;
+        var handler = new QueueHttpMessageHandler(
+            JsonResponse(splitResponse),
+            JsonResponse(dividendResponse),
+            JsonResponse(tickerEventsResponse),
+            JsonResponse(nextTickerEventsResponse),
+            JsonResponse(ipoResponse));
+        var provider = CreateProvider(handler);
+
+        var results = await provider.Get<MarketCorporateAction>(new CorporateActionHistoricalRequest
+        {
+            Tickers = ["AAPL", "UNMAPPED"],
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 31)
+        });
+
+        Assert.Equal(["AAPL", "UNMAPPED"], results.Select(result => result.Ticker));
+        var result = results[0];
+        Assert.Equal(
+            [
+                CorporateActionKind.Split,
+                CorporateActionKind.Dividend,
+                CorporateActionKind.TickerChange,
+                CorporateActionKind.TickerChange,
+                CorporateActionKind.Ipo
+            ],
+            result.Data.Select(action => action.Kind));
+        Assert.IsType<MarketDataTickerCorporateActionResult>(result);
+        Assert.Equal("split-1", result.Data[0].EventId);
+        Assert.Equal(4m, result.Data[0].SplitTo);
+        Assert.Equal("USD", result.Data[1].DividendCurrency);
+        Assert.Null(result.Data[1].RecordDate);
+        Assert.Equal(new DateOnly(2025, 1, 5), result.Data[2].EffectiveDate);
+        Assert.Equal("AAPL1", result.Data[2].RelatedTicker);
+        Assert.Equal("AAPL2", result.Data[3].RelatedTicker);
+        Assert.Equal("Apple Inc.", result.Data[4].IssuerName);
+        Assert.Equal("USD", result.Data[4].CurrencyCode);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "UnsupportedActionTypes");
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "InvalidOptionalEventDate");
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == "NoCorporateActions");
+        Assert.Empty(results[1].Data);
+        Assert.Contains(results[1].Diagnostics, diagnostic => diagnostic.Code == "TickerMappingError");
+        Assert.Equal(5, handler.Requests.Count);
     }
 
     #endregion
@@ -521,8 +766,13 @@ public sealed class MassiveHistoricalMarketDataProviderTests
             timeProvider);
         return new MassiveHistoricalMarketDataProvider(
             apiClient,
+            apiClient,
             new MassiveOhlcMapper(),
             new StubInstrumentReferential(mappings ?? CreateDefaultMappings()));
+    }
+
+    private sealed class UnsupportedOhlcRequest : IMarketDataRequest<Ohlc>
+    {
     }
 
     private static IReadOnlyList<TickerProviderMapping> CreateDefaultMappings() =>

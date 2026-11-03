@@ -21,7 +21,8 @@
     <None Include="..\..\..\src\Data\Njord.DataProviders.Massive\massive.settings.json"
           Link="massive.settings.json"
           CopyToOutputDirectory="PreserveNewest" />
-    <None Update="referential.settings.example.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="massive-referential.settings.example.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="massive-instruments.example.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

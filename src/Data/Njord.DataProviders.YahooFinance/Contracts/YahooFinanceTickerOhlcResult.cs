@@ -22,6 +22,9 @@ public sealed record YahooFinanceTickerOhlcResult
         }
     }
 
+    /// <summary>Gets the exchange timezone reported by Yahoo Finance, when available.</summary>
+    public string? ExchangeTimeZoneId { get; init; }
+
     /// <summary>Gets the available OHLC bars in chronological order.</summary>
     public required IReadOnlyList<Ohlc> Bars
     {

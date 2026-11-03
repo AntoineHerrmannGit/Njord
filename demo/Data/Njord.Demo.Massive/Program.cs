@@ -3,27 +3,71 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Njord.Core.FileManagement;
+using Njord.Core.Serialization;
+using Njord.Data.MarketData.Contracts;
 using Njord.Data.Referential.Configuration;
 using Njord.Data.Referential.Contracts;
 using Njord.Data.Referential.Errors;
+using Njord.Data.Referential.Models;
 using Njord.DataProviders.Massive.Configuration;
-using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Errors;
+using Njord.Models.MarketData;
 
 namespace Njord.Demo.Massive;
 
 internal static class Program
 {
+    #region Demo instruments
+
+    private static readonly DateOnly From = new(2025, 1, 2);
+    private static readonly DateOnly To = new(2025, 1, 10);
+
+    private static readonly DemoInstrument[] Instruments =
+    [
+        new()
+        {
+            AssetClass = "Stock",
+            Ticker = "AAPL",
+            Description = "Apple Inc."
+        },
+        new()
+        {
+            AssetClass = "Index",
+            Ticker = "NDX",
+            Description = "Nasdaq-100 index"
+        },
+        new()
+        {
+            AssetClass = "Option",
+            Ticker = "AAPL-2025-01-17-C-100",
+            Description = "AAPL call, expiry 2025-01-17, strike 100"
+        },
+        new()
+        {
+            AssetClass = "Future",
+            Ticker = "ES=2025-09-19",
+            Description = "E-mini S&P 500 September 2025 future"
+        },
+        new()
+        {
+            AssetClass = "Crypto",
+            Ticker = "BTC/USD",
+            Description = "Bitcoin / U.S. dollar"
+        },
+        new()
+        {
+            AssetClass = "Forex",
+            Ticker = "EUR/USD",
+            Description = "Euro / U.S. dollar"
+        }
+    ];
+
+    #endregion
+
     #region Application
 
-    private static async Task<int> Main(string[] args)
+    private static async Task<int> Main()
     {
-        if (!TryReadRequest(args, out var tickers, out var from, out var to))
-        {
-            Console.Error.WriteLine("Usage : Njord.Demo.Massive [ticker1,ticker2,...] [date-debut yyyy-MM-dd] [date-fin yyyy-MM-dd]");
-            return 2;
-        }
-
         using var cancellationTokenSource = new CancellationTokenSource();
         Console.CancelKeyPress += (_, eventArgs) =>
         {
@@ -37,41 +81,120 @@ internal static class Program
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("massive.settings.json", optional: false, reloadOnChange: false)
                 .Build();
-            var referentialConfigurationPath = FindReferentialConfigurationPath();
+            var solutionRoot = Path.GetDirectoryName(FileManager.FindFile("Njord.slnx"))
+                ?? throw new InvalidOperationException("The Njord solution root could not be determined.");
+            var referentialConfigurationPath = Path.Combine(
+                solutionRoot,
+                "demo",
+                "Data",
+                "Njord.Demo.Massive",
+                "massive-referential.settings.example.json");
+            if (!File.Exists(referentialConfigurationPath))
+                throw new FileNotFoundException(
+                    "Create massive-referential.settings.example.json from massive-referential.settings.example.json before running the Massive demo.",
+                    referentialConfigurationPath);
+
             var referentialConfiguration = new ConfigurationBuilder()
                 .AddJsonFile(referentialConfigurationPath, optional: false, reloadOnChange: false)
                 .Build();
+            var configuredDataFilePath = referentialConfiguration["Referential:DataFilePath"]
+                ?? new ReferentialOptions().DataFilePath;
+            var absoluteDataFilePath = Path.GetFullPath(configuredDataFilePath, solutionRoot);
+            var resolvedReferentialConfiguration = new ConfigurationBuilder()
+                .AddConfiguration(referentialConfiguration)
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    [$"{ReferentialOptions.SectionName}:DataFilePath"] = absoluteDataFilePath
+                })
+                .Build();
             var services = new ServiceCollection();
-            services.AddNjordReferential(referentialConfiguration);
+            services.AddNjordReferential(resolvedReferentialConfiguration);
             services.AddMassiveDataProvider(massiveConfiguration);
 
             using var serviceProvider = services.BuildServiceProvider();
             using var scope = serviceProvider.CreateScope();
-            var provider = scope.ServiceProvider.GetRequiredService<IMassiveHistoricalMarketDataProvider>();
-            var request = new MassiveHistoricalOhlcRequest
-            {
-                Tickers = tickers,
-                From = from,
-                To = to,
-                Multiplier = 1,
-                Timespan = MassiveTimespan.Day
-            };
+            var referential = scope.ServiceProvider.GetRequiredService<IInstrumentReferential>();
+            var provider = scope.ServiceProvider.GetRequiredService<IMarketDataProvider<IMarketData>>();
+            await AddMissingDemoMappingsAsync(
+                referential,
+                absoluteDataFilePath,
+                cancellationTokenSource.Token);
 
-            Console.WriteLine(
-                $"Récupération Massive de {string.Join(", ", tickers)}, du {from:yyyy-MM-dd} au {to:yyyy-MM-dd}...");
-            var bars = await provider.GetHistoricalOhlcAsync(request, cancellationTokenSource.Token);
+            Console.WriteLine("Njord — historique OHLC Massive");
+            Console.WriteLine($"Période inclusive : {From:yyyy-MM-dd} à {To:yyyy-MM-dd} (barres journalières)");
+            Console.WriteLine($"Base du référentiel : {absoluteDataFilePath}");
+            Console.WriteLine("Résolution du référentiel (ticker Njord et symbole Massive) :");
 
-            if (bars.Count == 0)
-                Console.WriteLine("Aucune barre disponible pour cette période et ce ticker.");
-            else
+            foreach (var instrument in Instruments)
             {
-                foreach (var bar in bars)
+                try
+                {
+                    var mappings = await referential.ResolveAsync(
+                        instrument.Ticker,
+                        "Massive",
+                        From,
+                        To,
+                        cancellationTokenSource.Token);
+
+                    foreach (var mapping in mappings)
+                        Console.WriteLine(
+                            $"  {instrument.AssetClass,-7} Njord={mapping.Ticker} | Massive={mapping.ProviderTicker} | {instrument.Description}");
+                }
+                catch (TickerReferenceResolutionException exception)
+                {
                     Console.WriteLine(
-                        $"{bar.Timestamp:O} O={bar.Open} H={bar.High} L={bar.Low} C={bar.Close} V={bar.Volume?.ToString() ?? "n/d"}");
-
-                Console.WriteLine($"{bars.Count} barre(s) reçue(s).");
+                        $"  {instrument.AssetClass,-7} Njord={instrument.Ticker} | mapping non résolu : {exception.Message}");
+                }
             }
 
+            Console.WriteLine(
+                $"Récupération vectorielle de {Instruments.Length} ticker(s)...");
+            var results = await provider.Get<Ohlc>(
+                new MarketDataHistoricalOhlcRequest
+                {
+                    Tickers = Instruments.Select(instrument => instrument.Ticker).ToArray(),
+                    From = From,
+                    To = To,
+                    Multiplier = 1,
+                    Interval = MarketDataInterval.Day
+                },
+                cancellationTokenSource.Token);
+            var barCount = 0;
+            Console.WriteLine();
+            Console.WriteLine("Résultats (la disponibilité dépend du symbole, de l'historique et du compte Massive) :");
+            foreach (var result in results)
+            {
+                var instrument = Instruments.Single(item =>
+                    string.Equals(item.Ticker, result.Ticker, StringComparison.OrdinalIgnoreCase));
+                Console.WriteLine();
+                Console.WriteLine($"[{instrument.AssetClass}] {result.Ticker} — {result.Data.Count} barre(s)");
+
+                if (result.Data.Count == 0)
+                    Console.WriteLine("  Aucune barre exploitable renvoyée.");
+
+                foreach (var bar in result.Data)
+                {
+                    Console.WriteLine(
+                        $"  {bar.Timestamp:O} O={bar.Open} H={bar.High} L={bar.Low} C={bar.Close} " +
+                        $"V={bar.Volume?.ToString() ?? "n/d"}");
+                    barCount++;
+                }
+
+                foreach (var diagnostic in result.Diagnostics)
+                    Console.Error.WriteLine(
+                        $"  Diagnostic [{diagnostic.Code}] {result.Ticker} : {diagnostic.Message}");
+            }
+
+            Console.WriteLine();
+            if (barCount == 0)
+            {
+                Console.Error.WriteLine("Aucune barre OHLC n'a été récupérée.");
+                return 1;
+            }
+
+            Console.WriteLine($"{barCount} barre(s) reçue(s) au total.");
+            Console.WriteLine(
+                "Ces données de démonstration ne constituent ni une validation financière, ni une validation de qualité ou de complétude.");
             return 0;
         }
         catch (OptionsValidationException exception)
@@ -122,36 +245,53 @@ internal static class Program
 
     #endregion
 
-    #region Input and configuration
+    #region Referential initialization
 
-    private static string FindReferentialConfigurationPath()
-        => FileManager.FindFile("referential.settings.local.json");
-
-    private static bool TryReadRequest(
-        IReadOnlyList<string> args,
-        out IReadOnlyList<string> tickers,
-        out DateOnly from,
-        out DateOnly to)
+    private static async Task AddMissingDemoMappingsAsync(
+        IInstrumentReferential referential,
+        string referentialDataFilePath,
+        CancellationToken cancellationToken)
     {
-        tickers = args.Count > 0
-            ? args[0].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            : ["AAPL"];
-        to = DateOnly.FromDateTime(DateTime.UtcNow);
-        from = to.AddDays(-10);
+        var mappings = (await referential.GetMappingsAsync(cancellationToken).ConfigureAwait(false)).ToList();
+        var instrumentsWithoutMassiveMappings = Instruments
+            .Where(instrument => !mappings.Any(mapping =>
+                string.Equals(mapping.Ticker, instrument.Ticker, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(mapping.Provider, "Massive", StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+        if (instrumentsWithoutMassiveMappings.Length == 0)
+            return;
 
-        if (args.Count > 3 || tickers.Count == 0)
-            return false;
+        var seedJsonPath = Path.Combine(AppContext.BaseDirectory, "massive-instruments.example.json");
+        var seedJson = await File.ReadAllTextAsync(seedJsonPath, cancellationToken).ConfigureAwait(false);
+        var seedMappings = seedJson.Déserialize<List<TickerProviderMapping>>()
+            ?? throw new JsonException("Le fichier d'exemple Massive doit contenir un tableau de mappings.");
+        var mappingsToAdd = instrumentsWithoutMassiveMappings
+            .Select(instrument => seedMappings.SingleOrDefault(mapping =>
+                string.Equals(mapping.Ticker, instrument.Ticker, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(mapping.Provider, "Massive", StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidDataException(
+                    $"Aucun mapping Massive d'exemple n'existe pour le ticker '{instrument.Ticker}'."))
+            .ToArray();
 
-        if (args.Count > 1 &&
-            !DateOnly.TryParseExact(args[1], "yyyy-MM-dd", out from))
-            return false;
-
-        if (args.Count > 2 &&
-            !DateOnly.TryParseExact(args[2], "yyyy-MM-dd", out to))
-            return false;
-
-        return from <= to;
+        Console.WriteLine(
+            $"Ajout de {mappingsToAdd.Length} mapping(s) d'exemple Massive absent(s) dans le référentiel configuré.");
+        await referential.AddMappingsAsync(mappingsToAdd, cancellationToken).ConfigureAwait(false);
+        Console.WriteLine(
+            $"Mappings ajoutés à '{referentialDataFilePath}'. Les mappings déjà présents n'ont pas été modifiés.");
     }
 
     #endregion
+
+    private sealed record DemoInstrument
+    {
+        #region Instrument identity
+
+        public required string AssetClass { get; init; }
+
+        public required string Ticker { get; init; }
+
+        public required string Description { get; init; }
+
+        #endregion
+    }
 }

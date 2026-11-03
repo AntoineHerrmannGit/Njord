@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\Core\Njord.Core.Mapping\Njord.Core.Mapping.csproj" />
     <ProjectReference Include="..\..\Core\Njord.Core.Serialization\Njord.Core.Serialization.csproj" />
     <ProjectReference Include="..\..\Core\Njord.Core.Retry\Njord.Core.Retry.csproj" />
+    <ProjectReference Include="..\Njord.Data.MarketData\Njord.Data.MarketData.csproj" />
     <ProjectReference Include="..\Njord.Data.Referential\Njord.Data.Referential.csproj" />
     <ProjectReference Include="..\..\Models\Njord.Models\Njord.Models.csproj" />
   </ItemGroup>
