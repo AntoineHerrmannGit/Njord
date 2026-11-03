@@ -114,7 +114,7 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
         Uri requestUri,
         CancellationToken cancellationToken)
     {
-        _circuitBreaker.ThrowIfOpen();
+        var isProbe = _circuitBreaker.ThrowIfOpenAndAcquireProbe();
 
         try
         {
@@ -191,6 +191,11 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             _circuitBreaker.RecordTransientFailure();
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _circuitBreaker.ReleaseProbe(isProbe);
             throw;
         }
     }
@@ -288,7 +293,7 @@ internal sealed class MassiveAggregatesApiClient : IMassiveAggregatesApiClient
             .Split('&', StringSplitOptions.RemoveEmptyEntries)
             .Where(parameter =>
             {
-                var name = parameter.Split('=', 2)[0];
+                var name = parameter.Split('=', StringSplitOptions.TrimEntries)[0];
                 return !string.Equals(Uri.UnescapeDataString(name), "apiKey", StringComparison.OrdinalIgnoreCase);
             });
         var builder = new UriBuilder(nextUri)

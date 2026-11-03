@@ -2,11 +2,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Njord.Core.Mapping;
 using Njord.Core.Retry;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Mapping;
 using Njord.DataProviders.Massive.Provider;
 using Njord.DataProviders.Massive.Transport;
+using Njord.Models.MarketData;
 
 namespace Njord.DataProviders.Massive.Configuration;
 
@@ -50,7 +52,9 @@ public static class MassiveDataProviderServiceCollectionExtensions
                 serviceProvider.GetRequiredService<RetryPolicy>(),
                 serviceProvider.GetRequiredService<MassiveCircuitBreaker>(),
                 serviceProvider.GetRequiredService<TimeProvider>()));
-        services.AddSingleton<IMassiveOhlcMapper, MassiveOhlcMapper>();
+        services.AddSingleton<
+            IMapper<MassiveOhlcMappingInput, IReadOnlyList<Ohlc>>,
+            MassiveOhlcMapper>();
         services.AddTransient<IMassiveHistoricalMarketDataProvider, MassiveHistoricalMarketDataProvider>();
 
         return services;

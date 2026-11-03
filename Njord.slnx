@@ -3,12 +3,14 @@
   <Folder Name="/src/Core/">
     <Project Path="src/Core/Njord.Core.Extensions/Njord.Core.Extensions.csproj" />
     <Project Path="src/Core/Njord.Core.FileManagement/Njord.Core.FileManagement.csproj" Id="4126dae6-9c36-4d88-8e4d-e5527d8ff8e1" />
+    <Project Path="src/Core/Njord.Core.Mapping/Njord.Core.Mapping.csproj" />
     <Project Path="src/Core/Njord.Core.Retry/Njord.Core.Retry.csproj" />
     <Project Path="src/Core/Njord.Core.Serialization/Njord.Core.Serialization.csproj" />
   </Folder>
   <Folder Name="/src/Data/">
     <Project Path="src/Data/Njord.Data.Referential/Njord.Data.Referential.csproj" />
     <Project Path="src/Data/Njord.DataProviders.Massive/Njord.DataProviders.Massive.csproj" />
+    <Project Path="src/Data/Njord.DataProviders.YahooFinance/Njord.DataProviders.YahooFinance.csproj" />
   </Folder>
   <Folder Name="/src/Models/">
     <Project Path="src/Models/Njord.Models/Njord.Models.csproj" />
@@ -34,6 +36,7 @@
   <Folder Name="/tests/Data/">
     <Project Path="tests/Data/Njord.Data.Referential.Tests/Njord.Data.Referential.Tests.csproj" />
     <Project Path="tests/Data/Njord.DataProviders.Massive.Tests/Njord.DataProviders.Massive.Tests.csproj" />
+    <Project Path="tests/Data/Njord.DataProviders.YahooFinance.Tests/Njord.DataProviders.YahooFinance.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Models/">
     <Project Path="tests/Models/Njord.Models.Tests/Njord.Models.Tests.csproj" />

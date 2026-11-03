@@ -1,0 +1,15 @@
+{
+  "DataProviders": {
+    "YahooFinance": {
+      "BaseAddress": "https://query1.finance.yahoo.com/",
+      "RequestTimeout": "00:00:30",
+      "MaximumBarsPerQuery": 100000,
+      "Retry": {
+        "Pattern": "Exponential",
+        "MaxRetryAttempts": 2,
+        "BaseDelay": "00:00:00.500",
+        "MaximumDelay": "00:00:30"
+      }
+    }
+  }
+}

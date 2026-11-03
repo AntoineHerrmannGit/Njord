@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Njord.Core.Mapping;
 using Njord.Core.Retry;
 using Njord.Data.Referential.Contracts;
 using Njord.Data.Referential.Errors;
@@ -15,6 +15,7 @@ using Njord.DataProviders.Massive.Mapping;
 using Njord.DataProviders.Massive.Provider;
 using Njord.DataProviders.Massive.Transport;
 using Njord.Models.MarketData;
+using Njord.Data.Tests.Shared;
 
 namespace Njord.DataProviders.Massive.Tests;
 
@@ -440,6 +441,8 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         Assert.Equal(TimeSpan.FromMilliseconds(250), retryOptions.BaseDelay);
         Assert.Equal(TimeSpan.FromSeconds(5), retryOptions.MaximumDelay);
         Assert.NotNull(serviceProvider.GetRequiredService<RetryPolicy>());
+        Assert.NotNull(serviceProvider.GetRequiredService<
+            IMapper<MassiveOhlcMappingInput, IReadOnlyList<Ohlc>>>());
     }
 
     #endregion
@@ -561,47 +564,19 @@ public sealed class MassiveHistoricalMarketDataProviderTests
         };
 
     private static HttpResponseMessage JsonResponse(string json) =>
-        new(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
+        HttpTestResponses.JsonResponse(json);
 
-    private sealed class StubHttpClientFactory : IHttpClientFactory
+    private sealed class QueueHttpMessageHandler : QueuedHttpMessageHandler<RequestSnapshot>
     {
-        private readonly HttpMessageHandler _handler;
-
-        public StubHttpClientFactory(HttpMessageHandler handler)
-        {
-            _handler = handler;
-        }
-
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
-    }
-
-    private sealed class QueueHttpMessageHandler : HttpMessageHandler
-    {
-        private readonly Queue<HttpResponseMessage> _responses;
-
         public QueueHttpMessageHandler(params HttpResponseMessage[] responses)
+            : base(
+                responses,
+                request => new RequestSnapshot(
+                    request.RequestUri,
+                    request.Headers.Authorization))
         {
-            _responses = new Queue<HttpResponseMessage>(responses);
         }
 
-        public List<RequestSnapshot> Requests { get; } = [];
-
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            Requests.Add(new RequestSnapshot(
-                request.RequestUri,
-                request.Headers.Authorization));
-
-            if (_responses.Count == 0)
-                throw new InvalidOperationException("No HTTP response was queued for the request.");
-
-            return Task.FromResult(_responses.Dequeue());
-        }
     }
 
     private sealed record RequestSnapshot(Uri? Uri, AuthenticationHeaderValue? Authorization);

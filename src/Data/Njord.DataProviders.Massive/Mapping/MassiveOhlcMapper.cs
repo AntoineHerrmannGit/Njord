@@ -1,3 +1,4 @@
+using Njord.Core.Mapping;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Errors;
 using Njord.DataProviders.Massive.Serialization;
@@ -5,16 +6,18 @@ using Njord.Models.MarketData;
 
 namespace Njord.DataProviders.Massive.Mapping;
 
-internal sealed class MassiveOhlcMapper : IMassiveOhlcMapper
+internal sealed class MassiveOhlcMapper : IMapper<MassiveOhlcMappingInput, IReadOnlyList<Ohlc>>
 {
     #region Market data mapping
 
-    public IReadOnlyList<Ohlc> Map(
-        IReadOnlyList<MassiveAggregateResponseDto> pages,
-        MassiveResolvedOhlcRequest request)
+    public IReadOnlyList<Ohlc> Map(MassiveOhlcMappingInput input)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(input.Pages);
+        ArgumentNullException.ThrowIfNull(input.Request);
+
         var bars = new List<Ohlc>();
-        foreach (var page in pages)
+        foreach (var page in input.Pages)
         {
             if (page.Results is null)
                 throw new MassiveDataProviderException(
@@ -24,10 +27,10 @@ internal sealed class MassiveOhlcMapper : IMassiveOhlcMapper
             foreach (var aggregate in page.Results)
             {
                 if (aggregate.Ticker is not null &&
-                    !string.Equals(aggregate.Ticker, request.Ticker, StringComparison.Ordinal))
+                    !string.Equals(aggregate.Ticker, input.Request.Ticker, StringComparison.Ordinal))
                     throw InvalidAggregate("Massive returned a futures bar for a different ticker.", page.RequestId);
 
-                bars.Add(MapBar(aggregate, page.Adjusted, request, page.RequestId));
+                bars.Add(MapBar(aggregate, page.Adjusted, input.Request, page.RequestId));
             }
         }
 

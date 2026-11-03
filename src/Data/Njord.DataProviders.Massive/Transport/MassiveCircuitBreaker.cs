@@ -25,12 +25,12 @@ internal sealed class MassiveCircuitBreaker
         _timeProvider = timeProvider;
     }
 
-    public void ThrowIfOpen()
+    public bool ThrowIfOpenAndAcquireProbe()
     {
         lock (_gate)
         {
             if (!_openedAt.HasValue)
-                return;
+                return false;
 
             var retryAfter = _openedAt.Value + _breakDuration - _timeProvider.GetUtcNow();
             if (retryAfter > TimeSpan.Zero)
@@ -40,6 +40,19 @@ internal sealed class MassiveCircuitBreaker
                 throw new MassiveCircuitOpenException(TimeSpan.Zero);
 
             _probeInProgress = true;
+            return true;
+        }
+    }
+
+    public void ReleaseProbe(bool isProbe)
+    {
+        if (!isProbe)
+            return;
+
+        lock (_gate)
+        {
+            if (_openedAt.HasValue && _probeInProgress)
+                _probeInProgress = false;
         }
     }
 

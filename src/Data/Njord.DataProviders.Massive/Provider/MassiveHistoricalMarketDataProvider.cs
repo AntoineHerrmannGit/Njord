@@ -1,3 +1,4 @@
+using Njord.Core.Mapping;
 using Njord.DataProviders.Massive.Contracts;
 using Njord.DataProviders.Massive.Errors;
 using Njord.DataProviders.Massive.Mapping;
@@ -13,12 +14,12 @@ internal sealed class MassiveHistoricalMarketDataProvider : IMassiveHistoricalMa
     #region Provider dependencies
 
     private readonly IMassiveAggregatesApiClient _apiClient;
-    private readonly IMassiveOhlcMapper _mapper;
+    private readonly IMapper<MassiveOhlcMappingInput, IReadOnlyList<Ohlc>> _mapper;
     private readonly IInstrumentReferential _referential;
 
     public MassiveHistoricalMarketDataProvider(
         IMassiveAggregatesApiClient apiClient,
-        IMassiveOhlcMapper mapper,
+        IMapper<MassiveOhlcMappingInput, IReadOnlyList<Ohlc>> mapper,
         IInstrumentReferential referential)
     {
         _apiClient = apiClient;
@@ -64,7 +65,11 @@ internal sealed class MassiveHistoricalMarketDataProvider : IMassiveHistoricalMa
             var pages = await _apiClient
                 .GetHistoricalAggregatesAsync(resolvedRequest, cancellationToken)
                 .ConfigureAwait(false);
-            bars.AddRange(_mapper.Map(pages, resolvedRequest));
+            bars.AddRange(_mapper.Map(new MassiveOhlcMappingInput
+            {
+                Pages = pages,
+                Request = resolvedRequest
+            }));
         }
 
         return bars

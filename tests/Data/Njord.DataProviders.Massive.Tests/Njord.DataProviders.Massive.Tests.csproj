@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\..\src\Data\Njord.DataProviders.Massive\Njord.DataProviders.Massive.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\HttpTestFixtures.cs" Link="Shared\HttpTestFixtures.cs" />
+  </ItemGroup>
+
 </Project>

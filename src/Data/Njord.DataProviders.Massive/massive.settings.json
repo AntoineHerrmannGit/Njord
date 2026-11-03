@@ -5,7 +5,7 @@
       "ApiKey": "72u25s5oyclL8QBF1sXBe0zbtVPX6L5A",
       "RequestTimeout": "00:00:30",
       "Retry": {
-        "Pattern": "Exponential",
+        "Pattern": "Linear",
         "MaxRetryAttempts": 2,
         "BaseDelay": "00:00:00.500",
         "MaximumDelay": "00:00:30"
