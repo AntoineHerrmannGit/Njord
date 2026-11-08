@@ -1,5 +1,12 @@
 # Consignes de développement Njord
 
+## Routage par défaut des demandes
+
+- Pour chaque nouveau prompt, sauf exception ci-dessous, transmets la demande complète à l’agent personnalisé `Njord Team Lead` avec l’outil d’agent avant de commencer l’analyse ou l’implémentation. Laisse le Team Lead coordonner la réponse et les spécialistes nécessaires.
+- Si l’utilisateur demande explicitement de ne pas déléguer, choisit un autre agent personnalisé dans le sélecteur, ou demande explicitement qu’un agent spécialisé prenne directement la tâche, respecte ce choix et ne reroute pas vers le Team Lead.
+- Si `Njord Team Lead` est déjà l’agent sélectionné, traite la demande directement sans tenter de t’appeler toi-même.
+- Si l’outil d’agent n’est pas disponible, ne prétends pas avoir transmis la demande ; indique cette limite et poursuis selon la demande et les consignes applicables.
+
 ## Références du projet
 
 - Avant chaque tâche de développement, consulte `.prompts/ProjectOverview.md`, `.prompts/BusinessContext.md` et `.prompts/EngineeringPractices.md`.
